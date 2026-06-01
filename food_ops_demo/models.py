@@ -36,3 +36,30 @@ class ParseResult(BaseModel):
     plan: OperationPlan | None = None
     errors: list[ErrorDetail] = Field(default_factory=list)
 
+
+class MenuItem(BaseModel):
+    item_id: str
+    store_id: str
+    name: str
+    price: str
+    sale_status: str
+    image: str
+
+
+class StoreSnapshot(BaseModel):
+    store_id: str
+    store_name: str
+    phone: str
+    business_hours: list[dict[str, str]]
+    items: list[MenuItem]
+
+
+class OperationResult(BaseModel):
+    success: bool
+    error: ErrorDetail | None = None
+
+
+class ValidationResult(BaseModel):
+    plan: OperationPlan | None = None
+    preview: dict[str, Any] = Field(default_factory=dict)
+    errors: list[ErrorDetail] = Field(default_factory=list)
