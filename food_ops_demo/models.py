@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+from uuid import uuid4
+
+from pydantic import BaseModel, Field
+
+
+def utc_now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid4().hex[:12]}"
+
+
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+
+
+class OperationPlan(BaseModel):
+    id: str = Field(default_factory=lambda: new_id("plan"))
+    instruction: str
+    operation_type: str
+    store_name: str
+    target_name: str | None = None
+    changes: dict[str, Any] = Field(default_factory=dict)
+    risk_level: str = "unknown"
+    requires_approval: bool = False
+    created_at: str = Field(default_factory=utc_now_iso)
+
+
+class ParseResult(BaseModel):
+    plan: OperationPlan | None = None
+    errors: list[ErrorDetail] = Field(default_factory=list)
+
