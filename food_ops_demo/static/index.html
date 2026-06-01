@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>外卖运营 Agent 工作台</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --surface: #ffffff;
+      --surface-2: #f9fafb;
+      --text: #172033;
+      --muted: #667085;
+      --border: #d6dbe3;
+      --primary: #1769aa;
+      --primary-dark: #0f4c81;
+      --ok: #13795b;
+      --warn: #b7791f;
+      --danger: #c2410c;
+      --ink: #22272e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      line-height: 1.5;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      max-width: 1280px;
+      min-height: 64px;
+      margin: 0 auto;
+      padding: 12px 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+      gap: 16px;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px 20px 32px;
+    }
+
+    section,
+    aside {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .panel {
+      padding: 16px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel-title {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 112px;
+      resize: vertical;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: var(--text);
+      font: inherit;
+      background: var(--surface);
+    }
+
+    textarea:focus,
+    button:focus {
+      outline: 2px solid rgba(23, 105, 170, 0.24);
+      outline-offset: 2px;
+    }
+
+    .examples {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      border-color: var(--primary);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .primary:hover {
+      border-color: var(--primary-dark);
+      background: var(--primary-dark);
+    }
+
+    .danger {
+      border-color: #fed7aa;
+      color: var(--danger);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      min-height: 72px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-2);
+      padding: 10px;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      overflow-wrap: anywhere;
+      font-size: 16px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 8px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .timeline li {
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr);
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-2);
+    }
+
+    .state {
+      color: var(--primary-dark);
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .message {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    pre {
+      max-height: 320px;
+      overflow: auto;
+      margin: 0;
+      border-radius: 6px;
+      background: var(--ink);
+      color: #f6f8fa;
+      padding: 12px;
+      font-size: 12px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 920px) {
+      main,
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <h1>外卖运营 Agent 工作台</h1>
+      <button id="refreshButton" type="button">刷新数据</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="panel stack">
+      <section>
+        <div class="panel">
+          <h2 class="panel-title">指令</h2>
+          <label for="instructionInput">操作指令</label>
+          <textarea id="instructionInput">把人民广场店的招牌牛肉饭改成 29.9</textarea>
+          <div class="examples">
+            <button type="button" data-example="把人民广场店的招牌牛肉饭改成 29.9">改价</button>
+            <button type="button" data-example="把人民广场店的可乐下架">下架</button>
+            <button type="button" data-example="把人民广场店的可乐上架">上架</button>
+            <button type="button" data-example="把人民广场店营业时间改成 10:00 到 21:00">营业时间</button>
+          </div>
+          <div class="actions">
+            <button id="parseButton" class="primary" type="button">生成计划</button>
+            <button id="confirmButton" type="button" disabled>确认执行</button>
+          </div>
+          <div id="status" class="status"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="panel">
+          <h2 class="panel-title">人工介入</h2>
+          <div class="actions">
+            <button id="simulateLoginButton" type="button" disabled>模拟登录失效</button>
+            <button id="resumeButton" type="button" disabled>我已处理，继续执行</button>
+            <button id="cancelButton" class="danger" type="button" disabled>取消任务</button>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <div class="stack">
+      <section>
+        <div class="panel">
+          <h2 class="panel-title">操作计划</h2>
+          <div id="preview" class="preview-grid"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="panel">
+          <h2 class="panel-title">任务状态</h2>
+          <ul id="timeline" class="timeline"></ul>
+        </div>
+      </section>
+
+      <div class="two-col">
+        <section>
+          <div class="panel">
+            <h2 class="panel-title">Mock 门店数据</h2>
+            <div id="snapshot"></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="panel">
+            <h2 class="panel-title">审计结果</h2>
+            <pre id="auditOutput">[]</pre>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      taskId: null,
+      taskState: null,
+    };
+
+    const els = {
+      instruction: document.getElementById('instructionInput'),
+      parse: document.getElementById('parseButton'),
+      confirm: document.getElementById('confirmButton'),
+      simulateLogin: document.getElementById('simulateLoginButton'),
+      resume: document.getElementById('resumeButton'),
+      cancel: document.getElementById('cancelButton'),
+      refresh: document.getElementById('refreshButton'),
+      status: document.getElementById('status'),
+      preview: document.getElementById('preview'),
+      timeline: document.getElementById('timeline'),
+      snapshot: document.getElementById('snapshot'),
+      audit: document.getElementById('auditOutput'),
+    };
+
+    async function request(path, options = {}) {
+      const response = await fetch(path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options,
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    }
+
+    function setStatus(text, isError = false) {
+      els.status.textContent = text;
+      els.status.classList.toggle('error', isError);
+    }
+
+    function updateButtons() {
+      els.confirm.disabled = state.taskState !== 'awaiting_approval';
+      els.simulateLogin.disabled = !state.taskId || state.taskState === 'succeeded' || state.taskState === 'failed';
+      els.resume.disabled = state.taskState !== 'manual_required';
+      els.cancel.disabled = !state.taskId || state.taskState === 'succeeded' || state.taskState === 'cancelled';
+    }
+
+    function renderPreview(plan, preview) {
+      if (!plan) {
+        els.preview.innerHTML = '';
+        return;
+      }
+      const rows = [
+        ['操作类型', plan.operation_type],
+        ['门店', plan.store_name],
+        ['对象', plan.target_name || '营业时间'],
+        ['风险', plan.risk_level],
+        ['需要确认', plan.requires_approval ? '是' : '否'],
+        ['目标值', formatChanges(plan.changes)],
+      ];
+      els.preview.innerHTML = rows.map(([label, value]) => `
+        <div class="metric">
+          <span>${label}</span>
+          <strong>${escapeHtml(String(value))}</strong>
+        </div>
+      `).join('');
+      if (Object.keys(preview || {}).length) {
+        els.preview.insertAdjacentHTML('beforeend', `
+          <div class="metric">
+            <span>变更预览</span>
+            <strong>${escapeHtml(compactPreview(preview))}</strong>
+          </div>
+        `);
+      }
+    }
+
+    function renderTimeline(task) {
+      const events = task?.timeline || [];
+      els.timeline.innerHTML = events.map((event) => `
+        <li>
+          <div class="state">${escapeHtml(event.state)}</div>
+          <div class="message">${escapeHtml(event.message)}</div>
+        </li>
+      `).join('');
+    }
+
+    function renderSnapshot(snapshot) {
+      els.snapshot.innerHTML = `
+        <table>
+          <thead>
+            <tr><th>菜品</th><th>价格</th><th>状态</th></tr>
+          </thead>
+          <tbody>
+            ${snapshot.items.map((item) => `
+              <tr>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${escapeHtml(item.price)}</td>
+                <td>${escapeHtml(item.sale_status)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderTask(task) {
+      state.taskId = task.task_id;
+      state.taskState = task.state;
+      renderPreview(task.plan, task.preview);
+      renderTimeline(task);
+      updateButtons();
+    }
+
+    async function loadSnapshot() {
+      renderSnapshot(await request('/api/demo/snapshot'));
+    }
+
+    async function loadAudit() {
+      const data = await request('/api/demo/audit');
+      els.audit.textContent = JSON.stringify(data.items, null, 2);
+    }
+
+    async function parseAndCreateTask() {
+      try {
+        setStatus('');
+        const parsed = await request('/api/demo/parse', {
+          method: 'POST',
+          body: JSON.stringify({ text: els.instruction.value }),
+        });
+        if (parsed.errors.length) {
+          renderPreview(null, {});
+          renderTimeline(null);
+          setStatus(parsed.errors[0].message, true);
+          return;
+        }
+        const task = await request('/api/demo/tasks', {
+          method: 'POST',
+          body: JSON.stringify({ plan: parsed.plan, preview: parsed.preview }),
+        });
+        renderTask(task);
+        setStatus('计划已生成，等待确认。');
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    }
+
+    async function confirmTask() {
+      const task = await request(`/api/demo/tasks/${state.taskId}/confirm`, { method: 'POST' });
+      renderTask(task);
+      await loadSnapshot();
+      await loadAudit();
+      setStatus(task.state === 'succeeded' ? '执行成功。' : '执行未完成。', task.state !== 'succeeded');
+    }
+
+    async function simulateLoginExpired() {
+      const task = await request(`/api/demo/tasks/${state.taskId}/simulate-intervention`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'login_expired' }),
+      });
+      renderTask(task);
+      setStatus('任务需要人工介入。');
+    }
+
+    async function resumeTask() {
+      const task = await request(`/api/demo/tasks/${state.taskId}/resume`, { method: 'POST' });
+      renderTask(task);
+      await loadSnapshot();
+      await loadAudit();
+      setStatus(task.state === 'succeeded' ? '任务已继续并完成。' : '任务未完成。', task.state !== 'succeeded');
+    }
+
+    async function cancelTask() {
+      const task = await request(`/api/demo/tasks/${state.taskId}/cancel`, { method: 'POST' });
+      renderTask(task);
+      setStatus('任务已取消。');
+    }
+
+    function formatChanges(changes) {
+      if (changes.price) return changes.price;
+      if (changes.sale_status) return changes.sale_status;
+      if (changes.business_hours) return `${changes.business_hours[0].start}-${changes.business_hours[0].end}`;
+      return JSON.stringify(changes);
+    }
+
+    function compactPreview(preview) {
+      if (preview.current_price) return `${preview.current_price} -> ${preview.target_price}`;
+      if (preview.current_sale_status) return `${preview.current_sale_status} -> ${preview.target_sale_status}`;
+      if (preview.current_business_hours) {
+        return `${preview.current_business_hours[0].start}-${preview.current_business_hours[0].end} -> ${preview.target_business_hours[0].start}-${preview.target_business_hours[0].end}`;
+      }
+      return JSON.stringify(preview);
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    document.querySelectorAll('[data-example]').forEach((button) => {
+      button.addEventListener('click', () => {
+        els.instruction.value = button.dataset.example;
+      });
+    });
+    els.parse.addEventListener('click', parseAndCreateTask);
+    els.confirm.addEventListener('click', confirmTask);
+    els.simulateLogin.addEventListener('click', simulateLoginExpired);
+    els.resume.addEventListener('click', resumeTask);
+    els.cancel.addEventListener('click', cancelTask);
+    els.refresh.addEventListener('click', async () => {
+      await loadSnapshot();
+      await loadAudit();
+    });
+
+    loadSnapshot();
+    loadAudit();
+  </script>
+</body>
+</html>
