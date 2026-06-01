@@ -23,6 +23,7 @@ build/
 .vite/
 
 # Runtime demo data
+data/demo/
 data/demo/*.jsonl
 data/demo/*.log
 
