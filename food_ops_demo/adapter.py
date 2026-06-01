@@ -54,7 +54,7 @@ class FakePlatformAdapter(BasePlatformAdapter):
     def update_menu_price(self, store_name: str, item_name: str, price: str) -> OperationResult:
         if self.database is not None:
             updated = self.database.update_menu_price(store_name, item_name, price)
-            return OperationResult(success=True) if updated else self._database_not_found(store_name)
+            return OperationResult(success=True) if updated else _not_found()
 
         item = self._find_single_internal(store_name, item_name)
         if item is None:
@@ -65,7 +65,7 @@ class FakePlatformAdapter(BasePlatformAdapter):
     def update_menu_sale_status(self, store_name: str, item_name: str, sale_status: str) -> OperationResult:
         if self.database is not None:
             updated = self.database.update_menu_sale_status(store_name, item_name, sale_status)
-            return OperationResult(success=True) if updated else self._database_not_found(store_name)
+            return OperationResult(success=True) if updated else _not_found()
 
         item = self._find_single_internal(store_name, item_name)
         if item is None:
@@ -92,16 +92,6 @@ class FakePlatformAdapter(BasePlatformAdapter):
         if len(matches) != 1:
             return None
         return matches[0]
-
-    def _database_not_found(self, store_name: str) -> OperationResult:
-        if self.database is None:
-            return _not_found()
-        try:
-            self.database.get_store_snapshot(store_name)
-        except KeyError:
-            return _store_not_found(store_name)
-        return _not_found()
-
 
 def _seed_memory_stores() -> dict[str, StoreSnapshot]:
     return {

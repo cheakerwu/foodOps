@@ -60,3 +60,42 @@ def test_fake_adapter_can_persist_through_database(tmp_path):
     item = second.find_menu_items("人民广场店", "招牌牛肉饭")[0]
 
     assert item.price == "29.90"
+
+
+def test_fake_adapter_missing_menu_item_returns_target_not_found_in_both_modes(tmp_path):
+    for adapter in _memory_and_database_adapters(tmp_path):
+        result = adapter.update_menu_price("人民广场店", "不存在的菜", "29.90")
+
+        assert result.success is False
+        assert result.error.code == "target_not_found"
+
+
+def test_fake_adapter_missing_store_for_price_update_returns_target_not_found_in_both_modes(tmp_path):
+    for adapter in _memory_and_database_adapters(tmp_path):
+        result = adapter.update_menu_price("不存在的门店", "招牌牛肉饭", "29.90")
+
+        assert result.success is False
+        assert result.error.code == "target_not_found"
+
+
+def test_fake_adapter_missing_store_for_sale_status_returns_target_not_found_in_both_modes(tmp_path):
+    for adapter in _memory_and_database_adapters(tmp_path):
+        result = adapter.update_menu_sale_status("不存在的门店", "可乐", "off_sale")
+
+        assert result.success is False
+        assert result.error.code == "target_not_found"
+
+
+def test_fake_adapter_missing_store_for_business_hours_returns_store_not_found_in_both_modes(tmp_path):
+    for adapter in _memory_and_database_adapters(tmp_path):
+        result = adapter.update_business_hours("不存在的门店", [{"start": "10:00", "end": "21:00"}])
+
+        assert result.success is False
+        assert result.error.code == "store_not_found"
+
+
+def _memory_and_database_adapters(tmp_path):
+    return [
+        FakePlatformAdapter(),
+        FakePlatformAdapter(database=DemoDatabase(tmp_path / "demo.sqlite3")),
+    ]
