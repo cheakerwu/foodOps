@@ -4,6 +4,7 @@ from food_ops_demo.adapter import FakePlatformAdapter
 from food_ops_demo.audit import AuditLog
 from food_ops_demo.parser import parse_instruction
 from food_ops_demo.risk import validate_plan
+from food_ops_demo.storage import DemoDatabase
 from food_ops_demo.workflow import TaskManager
 
 
@@ -49,6 +50,20 @@ def test_confirm_task_executes_and_writes_audit(tmp_path):
     record = json.loads(audit_path.read_text(encoding="utf-8").strip())
     assert record["task_id"] == task.task_id
     assert record["result"]["verified"] is True
+
+
+def test_task_manager_persists_tasks_across_instances(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    adapter = FakePlatformAdapter(database=db)
+    first = TaskManager(adapter=adapter, audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    plan, preview = _validated_plan("把人民广场店的招牌牛肉饭改成 29.9", adapter)
+    task = first.create_task(plan, preview)
+    first.confirm_task(task.task_id)
+    second = TaskManager(adapter=FakePlatformAdapter(database=db), audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    loaded = second.get_task(task.task_id)
+    assert loaded is not None
+    assert loaded.state == "succeeded"
+    assert loaded.result["verified"] is True
 
 
 def test_manual_intervention_can_resume_to_success(tmp_path):

@@ -4,7 +4,7 @@ from food_ops_demo.app import create_app
 
 
 def test_health_and_snapshot(tmp_path):
-    client = TestClient(create_app(audit_path=tmp_path / "audit.jsonl"))
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
 
     health = client.get("/health")
     snapshot = client.get("/api/demo/snapshot")
@@ -16,7 +16,7 @@ def test_health_and_snapshot(tmp_path):
 
 
 def test_parse_create_confirm_task_flow(tmp_path):
-    client = TestClient(create_app(audit_path=tmp_path / "audit.jsonl"))
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
 
     parsed = client.post("/api/demo/parse", json={"text": "把人民广场店的招牌牛肉饭改成 29.9"})
     parsed_body = parsed.json()
@@ -37,8 +37,17 @@ def test_parse_create_confirm_task_flow(tmp_path):
     assert snapshot["items"][0]["price"] == "29.90"
 
 
+def test_task_list_endpoint_returns_recent_tasks(tmp_path):
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
+    parsed = client.post("/api/demo/parse", json={"text": "把人民广场店的可乐下架"}).json()
+    created = client.post("/api/demo/tasks", json={"plan": parsed["plan"], "preview": parsed["preview"]}).json()
+    response = client.get("/api/demo/tasks")
+    assert response.status_code == 200
+    assert response.json()["items"][0]["task_id"] == created["task_id"]
+
+
 def test_invalid_parse_returns_structured_error(tmp_path):
-    client = TestClient(create_app(audit_path=tmp_path / "audit.jsonl"))
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
 
     response = client.post("/api/demo/parse", json={"text": "把人民广场店的不存在的菜改成 29.9"})
 
@@ -48,7 +57,7 @@ def test_invalid_parse_returns_structured_error(tmp_path):
 
 
 def test_manual_intervention_routes_resume_task(tmp_path):
-    client = TestClient(create_app(audit_path=tmp_path / "audit.jsonl"))
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
     parsed = client.post("/api/demo/parse", json={"text": "把人民广场店的可乐下架"}).json()
     task = client.post("/api/demo/tasks", json={"plan": parsed["plan"], "preview": parsed["preview"]}).json()
 
@@ -63,7 +72,7 @@ def test_manual_intervention_routes_resume_task(tmp_path):
 
 
 def test_audit_endpoint_returns_recent_records(tmp_path):
-    client = TestClient(create_app(audit_path=tmp_path / "audit.jsonl"))
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
     parsed = client.post("/api/demo/parse", json={"text": "把人民广场店的招牌牛肉饭改成 29.9"}).json()
     task = client.post("/api/demo/tasks", json={"plan": parsed["plan"], "preview": parsed["preview"]}).json()
     client.post(f"/api/demo/tasks/{task['task_id']}/confirm")
@@ -72,4 +81,3 @@ def test_audit_endpoint_returns_recent_records(tmp_path):
 
     assert audit.status_code == 200
     assert audit.json()["items"][0]["task_id"] == task["task_id"]
-

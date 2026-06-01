@@ -6,7 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from food_ops_demo.models import MenuItem, StoreSnapshot
+from food_ops_demo.models import MenuItem, StoreSnapshot, Task
 
 
 SEED_STORE_ID = "store_001"
@@ -100,6 +100,44 @@ class DemoDatabase:
             conn.execute("DELETE FROM stores")
             self._insert_seed_data(conn)
 
+    def save_task(self, task: Task) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO tasks (task_id, task_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(task_id) DO UPDATE SET
+                    task_json = excluded.task_json,
+                    updated_at = excluded.updated_at
+                """,
+                (task.task_id, task.model_dump_json(), task.updated_at),
+            )
+
+    def get_task(self, task_id: str) -> Task | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT task_json
+                FROM tasks
+                WHERE task_id = ?
+                """,
+                (task_id,),
+            ).fetchone()
+        return Task.model_validate_json(row["task_json"]) if row else None
+
+    def list_tasks(self, limit: int = 20) -> list[Task]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT task_json
+                FROM tasks
+                ORDER BY updated_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [Task.model_validate_json(row["task_json"]) for row in rows]
+
     def _update_menu_field(self, store_name: str, item_name: str, field: str, value: str) -> bool:
         if field not in {"price", "sale_status"}:
             raise ValueError(field)
@@ -155,6 +193,15 @@ class DemoDatabase:
                     image TEXT NOT NULL,
                     sort_order INTEGER NOT NULL,
                     FOREIGN KEY (store_id) REFERENCES stores(store_id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tasks (
+                    task_id TEXT PRIMARY KEY,
+                    task_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
                 """
             )

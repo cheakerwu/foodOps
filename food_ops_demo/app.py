@@ -13,6 +13,7 @@ from food_ops_demo.audit import AuditLog
 from food_ops_demo.models import OperationPlan
 from food_ops_demo.parser import parse_instruction
 from food_ops_demo.risk import validate_plan
+from food_ops_demo.storage import DemoDatabase
 from food_ops_demo.workflow import TaskManager
 
 
@@ -32,10 +33,11 @@ class InterventionRequest(BaseModel):
     type: str
 
 
-def create_app(audit_path: str | Path | None = None) -> FastAPI:
-    adapter = FakePlatformAdapter()
+def create_app(audit_path: str | Path | None = None, database_path: str | Path | None = None) -> FastAPI:
+    database = DemoDatabase(database_path or os.getenv("FOOD_OPS_DATABASE_PATH", "data/demo/demo.sqlite3"))
+    adapter = FakePlatformAdapter(database=database)
     audit_log = AuditLog(audit_path or os.getenv("FOOD_OPS_AUDIT_PATH", "data/demo/audit.jsonl"))
-    manager = TaskManager(adapter=adapter, audit_log=audit_log)
+    manager = TaskManager(adapter=adapter, audit_log=audit_log, database=database)
     static_page = Path(__file__).parent / "static" / "index.html"
 
     app = FastAPI(title="Food Ops Agent MVP")
@@ -69,6 +71,10 @@ def create_app(audit_path: str | Path | None = None) -> FastAPI:
     def create_task(payload: CreateTaskRequest) -> dict[str, Any]:
         task = manager.create_task(payload.plan, payload.preview)
         return task.model_dump(mode="json")
+
+    @app.get("/api/demo/tasks")
+    def list_tasks() -> dict[str, Any]:
+        return {"items": [task.model_dump(mode="json") for task in manager.list_tasks()]}
 
     @app.get("/api/demo/tasks/{task_id}")
     def get_task(task_id: str) -> dict[str, Any]:
@@ -105,4 +111,3 @@ def _task_response(task) -> dict[str, Any]:
 
 
 app = create_app()
-
