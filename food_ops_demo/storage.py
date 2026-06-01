@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 import json
 import sqlite3
 from pathlib import Path
@@ -96,7 +98,7 @@ class DemoDatabase:
         with self._connect() as conn:
             conn.execute("DELETE FROM menu_items")
             conn.execute("DELETE FROM stores")
-        self._insert_seed_data()
+            self._insert_seed_data(conn)
 
     def _update_menu_field(self, store_name: str, item_name: str, field: str, value: str) -> bool:
         if field not in {"price", "sale_status"}:
@@ -116,10 +118,19 @@ class DemoDatabase:
             )
             return cursor.rowcount == 1
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         conn = sqlite3.connect(self.path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_schema(self) -> None:
         with self._connect() as conn:
@@ -151,29 +162,28 @@ class DemoDatabase:
     def _seed_if_empty(self) -> None:
         with self._connect() as conn:
             count = conn.execute("SELECT COUNT(*) FROM stores").fetchone()[0]
-        if count == 0:
-            self._insert_seed_data()
+            if count == 0:
+                self._insert_seed_data(conn)
 
-    def _insert_seed_data(self) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO stores (store_id, store_name, phone, business_hours_json)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    SEED_STORE_ID,
-                    SEED_STORE_NAME,
-                    "021-88888888",
-                    json.dumps(SEED_BUSINESS_HOURS, ensure_ascii=False, separators=(",", ":")),
-                ),
+    def _insert_seed_data(self, conn: sqlite3.Connection) -> None:
+        conn.execute(
+            """
+            INSERT INTO stores (store_id, store_name, phone, business_hours_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                SEED_STORE_ID,
+                SEED_STORE_NAME,
+                "021-88888888",
+                json.dumps(SEED_BUSINESS_HOURS, ensure_ascii=False, separators=(",", ":")),
+            ),
+        )
+        conn.executemany(
+            """
+            INSERT INTO menu_items (
+                item_id, store_id, name, price, sale_status, image, sort_order
             )
-            conn.executemany(
-                """
-                INSERT INTO menu_items (
-                    item_id, store_id, name, price, sale_status, image, sort_order
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                SEED_MENU_ITEMS,
-            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            SEED_MENU_ITEMS,
+        )
