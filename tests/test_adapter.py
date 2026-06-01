@@ -42,6 +42,16 @@ def test_fake_adapter_updates_business_hours():
     assert snapshot.business_hours == [{"start": "10:00", "end": "21:00"}]
 
 
+def test_fake_adapter_updates_store_phone():
+    adapter = FakePlatformAdapter()
+
+    result = adapter.update_store_phone("人民广场店", "021-66668888")
+    snapshot = adapter.get_snapshot("人民广场店")
+
+    assert result.success is True
+    assert snapshot.phone == "021-66668888"
+
+
 def test_fake_adapter_reports_missing_target():
     adapter = FakePlatformAdapter()
 

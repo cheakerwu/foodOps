@@ -64,3 +64,15 @@ def test_manual_intervention_can_resume_to_success(tmp_path):
     assert resumed.state == "succeeded"
     assert resumed.manual_intervention_type == "login_expired"
     assert adapter.find_menu_items("人民广场店", "可乐")[0].sale_status == "off_sale"
+
+
+def test_confirm_phone_update_changes_snapshot(tmp_path):
+    adapter = FakePlatformAdapter()
+    manager = TaskManager(adapter=adapter, audit_log=AuditLog(tmp_path / "audit.jsonl"))
+    plan, preview = _validated_plan("把人民广场店联系电话改成 021-66668888", adapter)
+    task = manager.create_task(plan, preview)
+
+    completed = manager.confirm_task(task.task_id)
+
+    assert completed.state == "succeeded"
+    assert completed.after_snapshot["phone"] == "021-66668888"

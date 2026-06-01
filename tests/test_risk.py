@@ -71,3 +71,16 @@ def test_business_hours_change_is_high_risk():
     assert result.plan.requires_approval is True
     assert result.preview["current_business_hours"] == [{"start": "09:30", "end": "21:30"}]
     assert result.preview["target_business_hours"] == [{"start": "10:00", "end": "21:00"}]
+
+
+def test_phone_update_is_high_risk():
+    adapter = FakePlatformAdapter()
+    plan = parse_instruction("把人民广场店联系电话改成 021-66668888").plan
+
+    result = validate_plan(plan, adapter)
+
+    assert not result.errors
+    assert result.plan.risk_level == "high"
+    assert result.plan.requires_approval is True
+    assert result.preview["current_phone"] == "021-88888888"
+    assert result.preview["target_phone"] == "021-66668888"

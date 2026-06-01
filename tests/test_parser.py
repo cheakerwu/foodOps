@@ -38,3 +38,13 @@ def test_unknown_instruction_has_clear_error():
 
     assert result.plan is None
     assert result.errors[0].code == "unsupported_instruction"
+
+
+def test_parse_store_phone_update_instruction():
+    result = parse_instruction("把人民广场店联系电话改成 021-66668888")
+
+    assert not result.errors
+    assert result.plan is not None
+    assert result.plan.operation_type == "store.update_phone"
+    assert result.plan.store_name == "人民广场店"
+    assert result.plan.changes["phone"] == "021-66668888"

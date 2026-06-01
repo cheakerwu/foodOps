@@ -97,6 +97,8 @@ class TaskManager:
             return self.adapter.update_menu_sale_status(plan.store_name, plan.target_name or "", plan.changes["sale_status"])
         if plan.operation_type == "store.update_business_hours":
             return self.adapter.update_business_hours(plan.store_name, plan.changes["business_hours"])
+        if plan.operation_type == "store.update_phone":
+            return self.adapter.update_store_phone(plan.store_name, plan.changes["phone"])
         return OperationResult(
             success=False,
             error=ErrorDetail(code="unsupported_operation", message=f"暂不支持操作类型：{plan.operation_type}"),
@@ -105,6 +107,8 @@ class TaskManager:
     def _verify(self, plan: OperationPlan, snapshot: dict[str, Any]) -> bool:
         if plan.operation_type == "store.update_business_hours":
             return snapshot["business_hours"] == plan.changes["business_hours"]
+        if plan.operation_type == "store.update_phone":
+            return snapshot["phone"] == plan.changes["phone"]
 
         matches = [item for item in snapshot["items"] if item["name"] == plan.target_name]
         if len(matches) != 1:

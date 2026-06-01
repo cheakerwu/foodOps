@@ -27,6 +27,10 @@ class BasePlatformAdapter(ABC):
     def update_business_hours(self, store_name: str, business_hours: list[dict[str, str]]) -> OperationResult:
         raise NotImplementedError
 
+    @abstractmethod
+    def update_store_phone(self, store_name: str, phone: str) -> OperationResult:
+        raise NotImplementedError
+
 
 class FakePlatformAdapter(BasePlatformAdapter):
     def __init__(self, database: DemoDatabase | None = None) -> None:
@@ -82,6 +86,17 @@ class FakePlatformAdapter(BasePlatformAdapter):
         if store is None:
             return _store_not_found(store_name)
         store.business_hours = business_hours
+        return OperationResult(success=True)
+
+    def update_store_phone(self, store_name: str, phone: str) -> OperationResult:
+        if self.database is not None:
+            updated = self.database.update_store_phone(store_name, phone)
+            return OperationResult(success=True) if updated else _store_not_found(store_name)
+
+        store = self._stores.get(store_name)
+        if store is None:
+            return _store_not_found(store_name)
+        store.phone = phone
         return OperationResult(success=True)
 
     def _find_single_internal(self, store_name: str, item_name: str) -> MenuItem | None:

@@ -30,6 +30,18 @@ def validate_plan(plan: OperationPlan | None, adapter: BasePlatformAdapter) -> V
                 "target_business_hours": plan.changes["business_hours"],
             },
         )
+    if plan.operation_type == "store.update_phone":
+        validated = plan.model_copy(update={"risk_level": "high", "requires_approval": True})
+        return ValidationResult(
+            plan=validated,
+            preview={
+                "operation_type": plan.operation_type,
+                "store_name": snapshot.store_name,
+                "current_phone": snapshot.phone,
+                "target_phone": plan.changes["phone"],
+                "risk_level": "high",
+            },
+        )
 
     return _error("unsupported_operation", f"暂不支持操作类型：{plan.operation_type}")
 

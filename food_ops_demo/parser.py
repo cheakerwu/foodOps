@@ -11,6 +11,7 @@ SALE_STATUS_PATTERN = re.compile(r"^把(?P<store>.+?店)的(?P<target>.+?)(?P<ac
 BUSINESS_HOURS_PATTERN = re.compile(
     r"^把(?P<store>.+?店)营业时间改成\s*(?P<start>\d{1,2}(?::\d{2})?)\s*到\s*(?P<end>\d{1,2}(?::\d{2})?)$"
 )
+PHONE_PATTERN = re.compile(r"^把(?P<store>.+?店)(?:联系电话|电话)改成\s*(?P<phone>[0-9\-]{7,20})$")
 
 
 def parse_instruction(text: str) -> ParseResult:
@@ -55,6 +56,16 @@ def parse_instruction(text: str) -> ParseResult:
                         {"start": _format_time(match.group("start")), "end": _format_time(match.group("end"))}
                     ]
                 },
+            )
+        )
+
+    if match := PHONE_PATTERN.match(instruction):
+        return ParseResult(
+            plan=OperationPlan(
+                instruction=instruction,
+                operation_type="store.update_phone",
+                store_name=match.group("store"),
+                changes={"phone": match.group("phone")},
             )
         )
 
