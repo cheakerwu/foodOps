@@ -1,0 +1,36 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Node / frontend tooling
+node_modules/
+dist/
+build/
+.vite/
+
+# Runtime demo data
+data/demo/*.jsonl
+data/demo/*.log
+
+# Local tool state
+.codegraph/
+.worktrees/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
