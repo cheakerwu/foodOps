@@ -1,4 +1,5 @@
 from food_ops_demo.adapter import FakePlatformAdapter
+from food_ops_demo.storage import DemoDatabase
 
 
 def test_fake_adapter_returns_seed_snapshot():
@@ -49,3 +50,13 @@ def test_fake_adapter_reports_missing_target():
     assert result.success is False
     assert result.error.code == "target_not_found"
 
+
+def test_fake_adapter_can_persist_through_database(tmp_path):
+    path = tmp_path / "demo.sqlite3"
+    first = FakePlatformAdapter(database=DemoDatabase(path))
+    first.update_menu_price("人民广场店", "招牌牛肉饭", "29.90")
+
+    second = FakePlatformAdapter(database=DemoDatabase(path))
+    item = second.find_menu_items("人民广场店", "招牌牛肉饭")[0]
+
+    assert item.price == "29.90"
