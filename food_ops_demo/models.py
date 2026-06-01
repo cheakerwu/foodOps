@@ -63,3 +63,26 @@ class ValidationResult(BaseModel):
     plan: OperationPlan | None = None
     preview: dict[str, Any] = Field(default_factory=dict)
     errors: list[ErrorDetail] = Field(default_factory=list)
+
+
+class TimelineEvent(BaseModel):
+    state: str
+    message: str
+    error_code: str | None = None
+    timestamp: str = Field(default_factory=utc_now_iso)
+
+
+class Task(BaseModel):
+    task_id: str = Field(default_factory=lambda: new_id("task"))
+    instruction: str
+    plan: OperationPlan
+    state: str = "created"
+    preview: dict[str, Any] = Field(default_factory=dict)
+    timeline: list[TimelineEvent] = Field(default_factory=list)
+    before_snapshot: dict[str, Any] = Field(default_factory=dict)
+    after_snapshot: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)
+    error: ErrorDetail | None = None
+    manual_intervention_type: str | None = None
+    created_at: str = Field(default_factory=utc_now_iso)
+    updated_at: str = Field(default_factory=utc_now_iso)
