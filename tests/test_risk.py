@@ -84,3 +84,14 @@ def test_phone_update_is_high_risk():
     assert result.plan.requires_approval is True
     assert result.preview["current_phone"] == "021-88888888"
     assert result.preview["target_phone"] == "021-66668888"
+
+
+def test_sold_out_alias_uses_sale_status_preview():
+    adapter = FakePlatformAdapter()
+    plan = parse_instruction("把人民广场店的可乐设为售罄").plan
+
+    result = validate_plan(plan, adapter)
+
+    assert not result.errors
+    assert result.preview["current_sale_status"] == "on_sale"
+    assert result.preview["target_sale_status"] == "sold_out"

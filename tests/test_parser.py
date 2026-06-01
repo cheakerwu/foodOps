@@ -48,3 +48,19 @@ def test_parse_store_phone_update_instruction():
     assert result.plan.operation_type == "store.update_phone"
     assert result.plan.store_name == "人民广场店"
     assert result.plan.changes["phone"] == "021-66668888"
+
+
+def test_parse_mark_sold_out_alias():
+    result = parse_instruction("把人民广场店的可乐设为售罄")
+
+    assert not result.errors
+    assert result.plan.operation_type == "menu.update_sale_status"
+    assert result.plan.changes["sale_status"] == "sold_out"
+
+
+def test_parse_restore_sale_alias():
+    result = parse_instruction("把人民广场店的可乐恢复销售")
+
+    assert not result.errors
+    assert result.plan.operation_type == "menu.update_sale_status"
+    assert result.plan.changes["sale_status"] == "on_sale"

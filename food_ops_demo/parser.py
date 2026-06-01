@@ -7,7 +7,13 @@ from food_ops_demo.models import ErrorDetail, OperationPlan, ParseResult
 
 
 PRICE_PATTERN = re.compile(r"^把(?P<store>.+?店)的(?P<target>.+?)改成\s*(?P<price>\d+(?:\.\d+)?)$")
-SALE_STATUS_PATTERN = re.compile(r"^把(?P<store>.+?店)的(?P<target>.+?)(?P<action>下架|上架)$")
+SALE_STATUS_PATTERN = re.compile(r"^把(?P<store>.+?店)的(?P<target>.+?)(?P<action>下架|上架|设为售罄|恢复销售)$")
+SALE_STATUS_BY_ACTION = {
+    "下架": "off_sale",
+    "上架": "on_sale",
+    "设为售罄": "sold_out",
+    "恢复销售": "on_sale",
+}
 BUSINESS_HOURS_PATTERN = re.compile(
     r"^把(?P<store>.+?店)营业时间改成\s*(?P<start>\d{1,2}(?::\d{2})?)\s*到\s*(?P<end>\d{1,2}(?::\d{2})?)$"
 )
@@ -34,7 +40,7 @@ def parse_instruction(text: str) -> ParseResult:
         )
 
     if match := SALE_STATUS_PATTERN.match(instruction):
-        status = "off_sale" if match.group("action") == "下架" else "on_sale"
+        status = SALE_STATUS_BY_ACTION[match.group("action")]
         return ParseResult(
             plan=OperationPlan(
                 instruction=instruction,
