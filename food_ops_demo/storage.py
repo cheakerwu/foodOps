@@ -126,6 +126,8 @@ class DemoDatabase:
         return Task.model_validate_json(row["task_json"]) if row else None
 
     def list_tasks(self, limit: int = 20) -> list[Task]:
+        if limit < 0:
+            raise ValueError("limit must be non-negative")
         with self._connect() as conn:
             rows = conn.execute(
                 """

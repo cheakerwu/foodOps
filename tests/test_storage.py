@@ -2,7 +2,24 @@ import sqlite3
 
 import pytest
 
+from food_ops_demo.models import OperationPlan, Task
 from food_ops_demo.storage import DemoDatabase
+
+
+def _task(task_id: str, state: str = "awaiting_approval", updated_at: str = "2026-01-01T00:00:00+00:00") -> Task:
+    return Task(
+        task_id=task_id,
+        instruction=f"instruction {task_id}",
+        state=state,
+        updated_at=updated_at,
+        plan=OperationPlan(
+            instruction=f"instruction {task_id}",
+            operation_type="menu.update_price",
+            store_name="人民广场店",
+            target_name="招牌牛肉饭",
+            changes={"price": "29.90"},
+        ),
+    )
 
 
 def test_database_seeds_demo_store(tmp_path):
@@ -139,3 +156,43 @@ def test_database_connection_context_closes_connection(tmp_path):
 
     with pytest.raises(sqlite3.ProgrammingError):
         conn.execute("SELECT 1")
+
+
+def test_database_save_and_get_task_round_trip(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    task = _task("task_round_trip", state="succeeded")
+    task.result = {"verified": True}
+
+    db.save_task(task)
+    loaded = db.get_task(task.task_id)
+
+    assert loaded is not None
+    assert loaded.task_id == task.task_id
+    assert loaded.state == "succeeded"
+    assert loaded.result["verified"] is True
+
+
+def test_database_get_task_returns_none_for_missing_task(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+
+    assert db.get_task("missing_task") is None
+
+
+def test_database_list_tasks_orders_by_updated_at_and_applies_limit(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    older = _task("task_older", updated_at="2026-01-01T00:00:00+00:00")
+    newer = _task("task_newer", updated_at="2026-01-02T00:00:00+00:00")
+    newest = _task("task_newest", updated_at="2026-01-03T00:00:00+00:00")
+
+    db.save_task(older)
+    db.save_task(newest)
+    db.save_task(newer)
+
+    assert [task.task_id for task in db.list_tasks(limit=2)] == ["task_newest", "task_newer"]
+
+
+def test_database_list_tasks_rejects_negative_limit(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+
+    with pytest.raises(ValueError, match="limit"):
+        db.list_tasks(limit=-1)

@@ -1,7 +1,10 @@
 import json
 
+import pytest
+
 from food_ops_demo.adapter import FakePlatformAdapter
 from food_ops_demo.audit import AuditLog
+from food_ops_demo.models import OperationPlan
 from food_ops_demo.parser import parse_instruction
 from food_ops_demo.risk import validate_plan
 from food_ops_demo.storage import DemoDatabase
@@ -64,6 +67,107 @@ def test_task_manager_persists_tasks_across_instances(tmp_path):
     assert loaded is not None
     assert loaded.state == "succeeded"
     assert loaded.result["verified"] is True
+
+
+def test_task_manager_persists_cancelled_task(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    adapter = FakePlatformAdapter(database=db)
+    first = TaskManager(adapter=adapter, audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    plan, preview = _validated_plan("把人民广场店的可乐下架", adapter)
+    task = first.create_task(plan, preview)
+
+    first.cancel_task(task.task_id)
+    second = TaskManager(adapter=FakePlatformAdapter(database=db), audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    loaded = second.get_task(task.task_id)
+
+    assert loaded is not None
+    assert loaded.state == "cancelled"
+
+
+def test_task_manager_persists_manual_required_task(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    adapter = FakePlatformAdapter(database=db)
+    first = TaskManager(adapter=adapter, audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    plan, preview = _validated_plan("把人民广场店的可乐下架", adapter)
+    task = first.create_task(plan, preview)
+
+    first.simulate_intervention(task.task_id, "login_expired")
+    second = TaskManager(adapter=FakePlatformAdapter(database=db), audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    loaded = second.get_task(task.task_id)
+
+    assert loaded is not None
+    assert loaded.state == "manual_required"
+    assert loaded.manual_intervention_type == "login_expired"
+
+
+def test_task_manager_resumes_persisted_manual_task_to_success(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    adapter = FakePlatformAdapter(database=db)
+    first = TaskManager(adapter=adapter, audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    plan, preview = _validated_plan("把人民广场店的可乐下架", adapter)
+    task = first.create_task(plan, preview)
+    first.simulate_intervention(task.task_id, "login_expired")
+
+    second = TaskManager(adapter=FakePlatformAdapter(database=db), audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    resumed = second.resume_task(task.task_id)
+    third = TaskManager(adapter=FakePlatformAdapter(database=db), audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    loaded = third.get_task(task.task_id)
+
+    assert resumed.state == "succeeded"
+    assert loaded is not None
+    assert loaded.state == "succeeded"
+    assert loaded.result["verified"] is True
+
+
+def test_task_manager_persists_invalid_state_failure(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    adapter = FakePlatformAdapter(database=db)
+    first = TaskManager(adapter=adapter, audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    plan, preview = _validated_plan("把人民广场店的可乐下架", adapter)
+    task = first.create_task(plan, preview)
+    first.confirm_task(task.task_id)
+
+    second = TaskManager(adapter=FakePlatformAdapter(database=db), audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    failed = second.confirm_task(task.task_id)
+    third = TaskManager(adapter=FakePlatformAdapter(database=db), audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    loaded = third.get_task(task.task_id)
+
+    assert failed.state == "failed"
+    assert loaded is not None
+    assert loaded.state == "failed"
+    assert loaded.error is not None
+    assert loaded.error.code == "invalid_state"
+
+
+def test_task_manager_persists_execution_failure(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    adapter = FakePlatformAdapter(database=db)
+    manager = TaskManager(adapter=adapter, audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    plan = OperationPlan(
+        instruction="把人民广场店的不存在菜品改成 29.9",
+        operation_type="menu.update_price",
+        store_name="人民广场店",
+        target_name="不存在菜品",
+        changes={"price": "29.90"},
+    )
+    task = manager.create_task(plan, {})
+
+    failed = manager.confirm_task(task.task_id)
+    second = TaskManager(adapter=FakePlatformAdapter(database=db), audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    loaded = second.get_task(task.task_id)
+
+    assert failed.state == "failed"
+    assert loaded is not None
+    assert loaded.state == "failed"
+    assert loaded.error is not None
+    assert loaded.error.code == "target_not_found"
+
+
+def test_task_manager_list_tasks_rejects_negative_limit(tmp_path):
+    manager = TaskManager(adapter=FakePlatformAdapter(), audit_log=AuditLog(tmp_path / "audit.jsonl"))
+
+    with pytest.raises(ValueError, match="limit"):
+        manager.list_tasks(limit=-1)
 
 
 def test_manual_intervention_can_resume_to_success(tmp_path):

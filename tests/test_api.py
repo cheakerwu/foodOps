@@ -1,6 +1,30 @@
+import os
+import subprocess
+import sys
+
 from fastapi.testclient import TestClient
 
 from food_ops_demo.app import create_app
+
+
+def test_importing_app_module_does_not_create_default_database(tmp_path):
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.getcwd()
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import food_ops_demo.app; "
+            "from pathlib import Path; "
+            "raise SystemExit(1 if Path('data/demo/demo.sqlite3').exists() else 0)",
+        ],
+        cwd=tmp_path,
+        env=env,
+        check=False,
+    )
+
+    assert completed.returncode == 0
 
 
 def test_health_and_snapshot(tmp_path):

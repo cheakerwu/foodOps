@@ -108,6 +108,3 @@ def create_app(audit_path: str | Path | None = None, database_path: str | Path |
 
 def _task_response(task) -> dict[str, Any]:
     return task.model_dump(mode="json")
-
-
-app = create_app()

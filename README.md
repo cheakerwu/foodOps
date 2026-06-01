@@ -41,7 +41,7 @@ E:\anaconda\envs\jobhellper\python.exe
 启动本地工作台：
 
 ```powershell
-& 'E:\anaconda\envs\jobhellper\python.exe' -m uvicorn food_ops_demo.app:app --reload --host 127.0.0.1 --port 8765
+& 'E:\anaconda\envs\jobhellper\python.exe' -m uvicorn food_ops_demo.asgi:app --reload --host 127.0.0.1 --port 8765
 ```
 
 访问：

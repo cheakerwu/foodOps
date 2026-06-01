@@ -16,7 +16,7 @@ def test_static_page_contains_core_controls():
 
 
 def test_root_serves_static_page(tmp_path):
-    client = TestClient(create_app(audit_path=tmp_path / "audit.jsonl"))
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
 
     response = client.get("/")
 

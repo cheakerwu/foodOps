@@ -44,6 +44,8 @@ class TaskManager:
         return self._copy(task) if task else None
 
     def list_tasks(self, limit: int = 20) -> list[Task]:
+        if limit < 0:
+            raise ValueError("limit must be non-negative")
         if self.database is not None:
             return [self._copy(task) for task in self.database.list_tasks(limit=limit)]
         return [
