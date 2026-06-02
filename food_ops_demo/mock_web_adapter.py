@@ -157,8 +157,3 @@ def _not_found() -> OperationResult:
     )
 
 
-def _unsupported(operation_type: str) -> OperationResult:
-    return OperationResult(
-        success=False,
-        error=ErrorDetail(code="unsupported_operation", message=f"MockWebAdapter 暂不支持操作类型：{operation_type}"),
-    )
