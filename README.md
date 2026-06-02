@@ -116,6 +116,12 @@ $env:FOOD_OPS_SHADOW_HEADLESS='1'
 
 如果要指向真实后台，只修改 `FOOD_OPS_SHADOW_URL`。真实后台 Shadow Mode 仍然只预填不提交，提交动作必须由人工在后台完成或放弃。
 
+## Browser Runner And Multi-Store Orchestration
+
+Browser automation must not run as a shared FastAPI adapter singleton. The API process is the control plane: it parses instructions, validates plans, creates tasks, and enqueues work. Playwright belongs to a runner-owned execution plane, where each browser job has an explicit lifecycle, screenshots, retry state, and account/store lock.
+
+For multi-store price changes, the system decomposes one batch instruction into child `OperationPlan` records. Each child job uses a lock key of `platform_account_id:store_name`, so the same store is serialized while independent stores can proceed concurrently.
+
 ## 示例指令
 
 ```text

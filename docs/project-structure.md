@@ -66,6 +66,10 @@ D:\code\demov1
 - `food_ops_demo.static.index.html`：本地工作台页面，包含指令输入、人工确认、任务中心、快照和审计结果。
 - `food_ops_demo.mock_web_adapter.MockWebAdapter`：通过 Playwright 驱动本地 mock 商家后台页面，验证未来真实 RPA 适配器的执行边界。
 - `food_ops_demo.shadow_adapter.ShadowPlatformAdapter`：Phase 4 的只读/预填适配器，通过 Playwright 打开配置的后台页面，预填低风险输入并截图，明确返回 `submitted=false`。
+- `food_ops_demo.adapter_registry.AdapterRegistry`：创建共享非浏览器适配器和作用域浏览器适配器，使 Playwright 状态不由 FastAPI 路由全局持有。
+- `food_ops_demo.orchestration`：将多门店改价分解为子操作计划和锁键。
+- `food_ops_demo.runner.LocalRunner`：本地执行面原型，获取排队的任务、拥有适配器生命周期并记录完成状态。
+- `operation_jobs` SQLite 表：本地队列，用于建模未来 runner 调度和按门店加锁。
 - `food_ops_demo.static.mock_merchant.html`：本地仿真商家后台，用于 Playwright 点击、截图和异常注入。
 
 ## 已支持指令
