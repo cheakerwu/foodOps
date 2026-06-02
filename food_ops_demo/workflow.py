@@ -16,7 +16,7 @@ class TaskManager:
         audit_log: AuditLog | None = None,
         database: DemoDatabase | None = None,
     ) -> None:
-        self.adapter = adapter or FakePlatformAdapter()
+        self.adapter = adapter or FakePlatformAdapter(database=database)
         self.audit_log = audit_log or AuditLog(Path("data/demo/audit.jsonl"))
         self.database = database
         self._tasks: dict[str, Task] = {}

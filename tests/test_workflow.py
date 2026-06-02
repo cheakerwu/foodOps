@@ -69,6 +69,20 @@ def test_task_manager_persists_tasks_across_instances(tmp_path):
     assert loaded.result["verified"] is True
 
 
+def test_task_manager_default_adapter_uses_database_when_database_is_supplied(tmp_path):
+    db = DemoDatabase(tmp_path / "demo.sqlite3")
+    validation_adapter = FakePlatformAdapter(database=db)
+    manager = TaskManager(audit_log=AuditLog(tmp_path / "audit.jsonl"), database=db)
+    plan, preview = _validated_plan("把人民广场店的招牌牛肉饭改成 29.9", validation_adapter)
+    task = manager.create_task(plan, preview)
+
+    completed = manager.confirm_task(task.task_id)
+    persisted_item = db.find_menu_items(plan.store_name, plan.target_name or "")[0]
+
+    assert completed.state == "succeeded"
+    assert persisted_item.price == "29.90"
+
+
 def test_task_manager_persists_cancelled_task(tmp_path):
     db = DemoDatabase(tmp_path / "demo.sqlite3")
     adapter = FakePlatformAdapter(database=db)
