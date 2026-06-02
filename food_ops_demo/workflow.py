@@ -105,7 +105,10 @@ class TaskManager:
 
         if not skip_queue:
             self._set_state(task, "queued", "任务已进入执行队列。")
-            self._set_state(task, "executing", f"正在通过 {task.adapter_mode} 执行。")
+            if task.adapter_mode == "shadow":
+                self._set_state(task, "session_ready", "Shadow Mode 页面会话已就绪。")
+            else:
+                self._set_state(task, "executing", f"正在通过 {task.adapter_mode} 执行。")
 
         try:
             task.before_snapshot = adapter.get_snapshot(task.plan.store_name).model_dump(mode="json")
@@ -115,7 +118,14 @@ class TaskManager:
             self._persist(task)
             return self._copy(task)
 
+        if task.adapter_mode == "shadow":
+            self._set_state(task, "pre_snapshot_done", "已读取提交前快照。")
+            self._set_state(task, "executing", f"正在通过 {task.adapter_mode} 执行。")
+
         result = self._apply_plan(task.plan, adapter)
+        if result.shadow_mode and result.success:
+            return self._complete_shadow_task(task, result)
+
         if not result.success:
             task.error = result.error
             if result.error and result.error.code == "auth_required":
@@ -135,11 +145,25 @@ class TaskManager:
         self._set_state(task, "verifying", "正在回读校验执行结果。")
         task.after_snapshot = adapter.get_snapshot(task.plan.store_name).model_dump(mode="json")
         verified = self._verify(task.plan, task.after_snapshot)
-        task.result = {"success": result.success, "verified": verified}
+        task.result = {
+            "success": result.success,
+            "verified": verified,
+            "submitted": result.submitted,
+            "shadow_mode": result.shadow_mode,
+        }
         if verified:
             self._set_state(task, "succeeded", "任务执行成功，回读校验通过。")
         else:
             self._fail(task, "verification_failed", "执行后回读校验未通过。")
+        self._append_audit(task)
+        self._persist(task)
+        return self._copy(task)
+
+    def _complete_shadow_task(self, task: Task, result: OperationResult) -> Task:
+        task.result = result.model_dump(mode="json")
+        task.shadow_evidence = result.evidence
+        self._set_state(task, "shadow_prefilled", "Shadow Mode 已定位并预填，未提交。")
+        self._set_state(task, "pending_review", "等待人工在后台复核后决定是否手动提交。")
         self._append_audit(task)
         self._persist(task)
         return self._copy(task)
