@@ -332,6 +332,7 @@
           <select id="adapterMode">
             <option value="fake">FakeAdapter</option>
             <option value="mock_web">MockWebAdapter</option>
+            <option value="shadow">ShadowMode</option>
           </select>
           <a href="/mock/merchant" target="_blank" rel="noreferrer">打开 Mock 后台</a>
           <label for="instructionInput">操作指令</label>
@@ -442,11 +443,15 @@
       els.status.classList.toggle('error', isError);
     }
 
+    function updateConfirmButtonLabel() {
+      els.confirm.textContent = els.adapterMode.value === 'shadow' ? '开始预填' : '确认执行';
+    }
+
     function updateButtons() {
       els.confirm.disabled = state.taskState !== 'awaiting_approval';
-      els.simulateLogin.disabled = !state.taskId || state.taskState === 'succeeded' || state.taskState === 'failed';
+      els.simulateLogin.disabled = !state.taskId || state.taskState === 'succeeded' || state.taskState === 'failed' || state.taskState === 'pending_review';
       els.resume.disabled = state.taskState !== 'manual_required';
-      els.cancel.disabled = !state.taskId || state.taskState === 'succeeded' || state.taskState === 'cancelled';
+      els.cancel.disabled = !state.taskId || state.taskState === 'succeeded' || state.taskState === 'cancelled' || state.taskState === 'pending_review';
     }
 
     function renderPreview(plan, preview, adapterMode) {
@@ -587,7 +592,13 @@
       await loadSnapshot();
       await loadTasks();
       await loadAudit();
-      setStatus(task.state === 'succeeded' ? '执行成功。' : '执行未完成。', task.state !== 'succeeded');
+      if (task.state === 'pending_review') {
+        setStatus('Shadow Mode 已完成预填，未提交，等待人工复核。');
+      } else if (task.state === 'succeeded') {
+        setStatus('执行成功。');
+      } else {
+        setStatus('执行未完成。', true);
+      }
     }
 
     async function simulateLoginExpired() {
@@ -660,6 +671,8 @@
         els.instruction.value = button.dataset.example;
       });
     });
+    els.adapterMode.addEventListener('change', updateConfirmButtonLabel);
+    updateConfirmButtonLabel();
     els.parse.addEventListener('click', parseAndCreateTask);
     els.confirm.addEventListener('click', confirmTask);
     els.simulateLogin.addEventListener('click', simulateLoginExpired);

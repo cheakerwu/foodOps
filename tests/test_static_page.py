@@ -33,6 +33,16 @@ def test_static_page_contains_adapter_mode_controls():
     assert "MockWebAdapter" in html
 
 
+def test_static_page_contains_shadow_mode_controls():
+    html = Path("food_ops_demo/static/index.html").read_text(encoding="utf-8")
+
+    assert 'value="shadow"' in html
+    assert "ShadowMode" in html
+    assert "开始预填" in html
+    assert "pending_review" in html
+    assert "未提交" in html
+
+
 def test_root_serves_static_page(tmp_path):
     client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
 
