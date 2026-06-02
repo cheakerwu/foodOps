@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from food_ops_demo.adapter import FakePlatformAdapter
 from food_ops_demo.audit import AuditLog
+from food_ops_demo.mock_web_adapter import MockWebAdapter
 from food_ops_demo.models import OperationPlan
 from food_ops_demo.parser import parse_instruction
 from food_ops_demo.risk import validate_plan
@@ -22,22 +23,43 @@ DEFAULT_STORE_NAME = "人民广场店"
 
 class ParseRequest(BaseModel):
     text: str
+    adapter_mode: str = "fake"
 
 
 class CreateTaskRequest(BaseModel):
     plan: OperationPlan
     preview: dict[str, Any] = Field(default_factory=dict)
+    adapter_mode: str = "fake"
 
 
 class InterventionRequest(BaseModel):
     type: str
 
 
-def create_app(audit_path: str | Path | None = None, database_path: str | Path | None = None) -> FastAPI:
+def create_app(
+    audit_path: str | Path | None = None,
+    database_path: str | Path | None = None,
+    mock_web_url: str | None = None,
+) -> FastAPI:
     database = DemoDatabase(database_path or os.getenv("FOOD_OPS_DATABASE_PATH", "data/demo/demo.sqlite3"))
-    adapter = FakePlatformAdapter(database=database)
+    fake_adapter = FakePlatformAdapter(database=database)
+    mock_url = mock_web_url or os.getenv("FOOD_OPS_MOCK_WEB_URL", "http://127.0.0.1:8765/mock/merchant")
+    adapters = {
+        "fake": fake_adapter,
+        "mock_web": MockWebAdapter(
+            page_url=mock_url,
+            screenshot_dir=os.getenv("FOOD_OPS_MOCK_WEB_SCREENSHOT_DIR", "data/demo/mock-web-screenshots"),
+            headless=os.getenv("FOOD_OPS_MOCK_WEB_HEADLESS", "1") != "0",
+        ),
+    }
     audit_log = AuditLog(audit_path or os.getenv("FOOD_OPS_AUDIT_PATH", "data/demo/audit.jsonl"))
-    manager = TaskManager(adapter=adapter, audit_log=audit_log, database=database)
+    manager = TaskManager(
+        adapter=fake_adapter,
+        adapters=adapters,
+        default_adapter_mode="fake",
+        audit_log=audit_log,
+        database=database,
+    )
     static_page = Path(__file__).parent / "static" / "index.html"
 
     app = FastAPI(title="Food Ops Agent MVP")
@@ -58,7 +80,7 @@ def create_app(audit_path: str | Path | None = None, database_path: str | Path |
 
     @app.get("/api/demo/snapshot")
     def snapshot() -> dict[str, Any]:
-        return adapter.get_snapshot(DEFAULT_STORE_NAME).model_dump(mode="json")
+        return fake_adapter.get_snapshot(DEFAULT_STORE_NAME).model_dump(mode="json")
 
     @app.post("/api/demo/reset")
     def reset_demo() -> dict[str, str]:
@@ -67,11 +89,18 @@ def create_app(audit_path: str | Path | None = None, database_path: str | Path |
 
     @app.post("/api/demo/parse")
     def parse(payload: ParseRequest) -> dict[str, Any]:
+        selected_adapter = adapters.get(payload.adapter_mode)
+        if selected_adapter is None:
+            return {
+                "plan": None,
+                "preview": {},
+                "errors": [{"code": "adapter_mode_not_found", "message": f"找不到执行模式：{payload.adapter_mode}"}],
+            }
         parsed = parse_instruction(payload.text)
         if parsed.errors or parsed.plan is None:
             return {"plan": None, "preview": {}, "errors": [error.model_dump(mode="json") for error in parsed.errors]}
 
-        validated = validate_plan(parsed.plan, adapter)
+        validated = validate_plan(parsed.plan, selected_adapter)
         return {
             "plan": validated.plan.model_dump(mode="json") if validated.plan else None,
             "preview": validated.preview,
@@ -80,7 +109,7 @@ def create_app(audit_path: str | Path | None = None, database_path: str | Path |
 
     @app.post("/api/demo/tasks")
     def create_task(payload: CreateTaskRequest) -> dict[str, Any]:
-        task = manager.create_task(payload.plan, payload.preview)
+        task = manager.create_task(payload.plan, payload.preview, adapter_mode=payload.adapter_mode)
         return task.model_dump(mode="json")
 
     @app.get("/api/demo/tasks")

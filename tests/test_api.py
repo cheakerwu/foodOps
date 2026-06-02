@@ -122,3 +122,18 @@ def test_audit_endpoint_returns_recent_records(tmp_path):
 
     assert audit.status_code == 200
     assert audit.json()["items"][0]["task_id"] == task["task_id"]
+
+
+def test_parse_and_create_task_accept_adapter_mode(tmp_path):
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
+
+    parsed = client.post(
+        "/api/demo/parse",
+        json={"text": "把人民广场店的招牌牛肉饭改成 29.9", "adapter_mode": "fake"},
+    ).json()
+    created = client.post(
+        "/api/demo/tasks",
+        json={"plan": parsed["plan"], "preview": parsed["preview"], "adapter_mode": "fake"},
+    ).json()
+
+    assert created["adapter_mode"] == "fake"

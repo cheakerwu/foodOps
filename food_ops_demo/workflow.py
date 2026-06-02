@@ -15,14 +15,24 @@ class TaskManager:
         adapter: BasePlatformAdapter | None = None,
         audit_log: AuditLog | None = None,
         database: DemoDatabase | None = None,
+        adapters: dict[str, BasePlatformAdapter] | None = None,
+        default_adapter_mode: str = "fake",
     ) -> None:
-        self.adapter = adapter or FakePlatformAdapter(database=database)
+        default_adapter = adapter or FakePlatformAdapter(database=database)
+        self.adapters = adapters or {default_adapter_mode: default_adapter}
+        self.default_adapter_mode = default_adapter_mode
+        self.adapter = self.adapters[self.default_adapter_mode]
         self.audit_log = audit_log or AuditLog(Path("data/demo/audit.jsonl"))
         self.database = database
         self._tasks: dict[str, Task] = {}
 
-    def create_task(self, plan: OperationPlan, preview: dict[str, Any]) -> Task:
-        task = Task(instruction=plan.instruction, plan=plan, preview=preview)
+    def create_task(self, plan: OperationPlan, preview: dict[str, Any], adapter_mode: str | None = None) -> Task:
+        task = Task(
+            instruction=plan.instruction,
+            plan=plan,
+            preview=preview,
+            adapter_mode=adapter_mode or self.default_adapter_mode,
+        )
         for state, message in [
             ("created", "任务已创建。"),
             ("parsed", "指令已解析为标准操作计划。"),
@@ -83,20 +93,29 @@ class TaskManager:
         self._persist(task)
         return self._copy(task)
 
+    def _adapter_for(self, task: Task) -> BasePlatformAdapter | None:
+        return self.adapters.get(task.adapter_mode)
+
     def _execute(self, task: Task, skip_queue: bool = False) -> Task:
+        adapter = self._adapter_for(task)
+        if adapter is None:
+            self._fail(task, "adapter_mode_not_found", f"找不到执行模式：{task.adapter_mode}")
+            self._persist(task)
+            return self._copy(task)
+
         if not skip_queue:
             self._set_state(task, "queued", "任务已进入执行队列。")
-            self._set_state(task, "executing", "正在通过 FakeAdapter 执行。")
+            self._set_state(task, "executing", f"正在通过 {task.adapter_mode} 执行。")
 
         try:
-            task.before_snapshot = self.adapter.get_snapshot(task.plan.store_name).model_dump(mode="json")
+            task.before_snapshot = adapter.get_snapshot(task.plan.store_name).model_dump(mode="json")
         except KeyError:
             self._fail(task, "store_not_found", f"找不到门店：{task.plan.store_name}")
             self._append_audit(task)
             self._persist(task)
             return self._copy(task)
 
-        result = self._apply_plan(task.plan)
+        result = self._apply_plan(task.plan, adapter)
         if not result.success:
             task.error = result.error
             self._set_state(task, "failed", result.error.message if result.error else "执行失败。", result.error.code if result.error else None)
@@ -105,7 +124,7 @@ class TaskManager:
             return self._copy(task)
 
         self._set_state(task, "verifying", "正在回读校验执行结果。")
-        task.after_snapshot = self.adapter.get_snapshot(task.plan.store_name).model_dump(mode="json")
+        task.after_snapshot = adapter.get_snapshot(task.plan.store_name).model_dump(mode="json")
         verified = self._verify(task.plan, task.after_snapshot)
         task.result = {"success": result.success, "verified": verified}
         if verified:
@@ -116,15 +135,15 @@ class TaskManager:
         self._persist(task)
         return self._copy(task)
 
-    def _apply_plan(self, plan: OperationPlan) -> OperationResult:
+    def _apply_plan(self, plan: OperationPlan, adapter: BasePlatformAdapter) -> OperationResult:
         if plan.operation_type == "menu.update_price":
-            return self.adapter.update_menu_price(plan.store_name, plan.target_name or "", plan.changes["price"])
+            return adapter.update_menu_price(plan.store_name, plan.target_name or "", plan.changes["price"])
         if plan.operation_type == "menu.update_sale_status":
-            return self.adapter.update_menu_sale_status(plan.store_name, plan.target_name or "", plan.changes["sale_status"])
+            return adapter.update_menu_sale_status(plan.store_name, plan.target_name or "", plan.changes["sale_status"])
         if plan.operation_type == "store.update_business_hours":
-            return self.adapter.update_business_hours(plan.store_name, plan.changes["business_hours"])
+            return adapter.update_business_hours(plan.store_name, plan.changes["business_hours"])
         if plan.operation_type == "store.update_phone":
-            return self.adapter.update_store_phone(plan.store_name, plan.changes["phone"])
+            return adapter.update_store_phone(plan.store_name, plan.changes["phone"])
         return OperationResult(
             success=False,
             error=ErrorDetail(code="unsupported_operation", message=f"暂不支持操作类型：{plan.operation_type}"),

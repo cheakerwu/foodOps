@@ -76,6 +76,7 @@ class Task(BaseModel):
     task_id: str = Field(default_factory=lambda: new_id("task"))
     instruction: str
     plan: OperationPlan
+    adapter_mode: str = "fake"
     state: str = "created"
     preview: dict[str, Any] = Field(default_factory=dict)
     timeline: list[TimelineEvent] = Field(default_factory=list)
