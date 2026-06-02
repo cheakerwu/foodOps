@@ -110,3 +110,35 @@ def test_task_manager_keeps_fake_mode_committed_success(tmp_path):
     assert completed.result["submitted"] is True
     assert completed.result["shadow_mode"] is False
     assert completed.after_snapshot["items"][0]["price"] == "29.90"
+
+
+class UnsupportedShadowAdapter(FakePlatformAdapter):
+    def update_menu_sale_status(self, store_name: str, item_name: str, sale_status: str) -> OperationResult:
+        return OperationResult(
+            success=False,
+            submitted=False,
+            shadow_mode=True,
+            error=ErrorDetail(
+                code="shadow_operation_not_supported",
+                message="Shadow Mode 暂不支持售卖状态预填，因为当前控件会直接提交变更。",
+            ),
+        )
+
+
+def test_unsupported_shadow_operation_fails_without_submission(tmp_path):
+    adapter = UnsupportedShadowAdapter()
+    parsed = parse_instruction("把人民广场店的可乐设为售罄")
+    validated = validate_plan(parsed.plan, adapter)
+    assert validated.plan is not None
+    manager = TaskManager(
+        adapters={"shadow": adapter},
+        default_adapter_mode="shadow",
+        audit_log=AuditLog(tmp_path / "audit.jsonl"),
+    )
+
+    task = manager.create_task(validated.plan, validated.preview, adapter_mode="shadow")
+    completed = manager.confirm_task(task.task_id)
+
+    assert completed.state == "failed"
+    assert completed.error.code == "shadow_operation_not_supported"
+    assert completed.result == {}

@@ -44,3 +44,35 @@ def test_shadow_adapter_returns_not_found_without_prefill(mock_page_url, tmp_pat
     assert result.submitted is False
     assert result.shadow_mode is True
     assert result.error.code == "target_not_found"
+
+
+def test_shadow_adapter_prefills_phone_without_saving(mock_page_url, tmp_path):
+    adapter = ShadowPlatformAdapter(page_url=mock_page_url, screenshot_dir=tmp_path, headless=True)
+    try:
+        result = adapter.update_store_phone("人民广场店", "021-66668888")
+        snapshot = adapter.get_snapshot("人民广场店")
+    finally:
+        adapter.close()
+
+    assert result.success is True
+    assert result.submitted is False
+    assert result.shadow_mode is True
+    assert result.evidence["operation_type"] == "store.update_phone"
+    assert result.evidence["original_value"] == "021-88888888"
+    assert result.evidence["intended_value"] == "021-66668888"
+    assert snapshot.phone == "021-88888888"
+
+
+def test_shadow_adapter_rejects_sale_status_because_button_would_submit(mock_page_url, tmp_path):
+    adapter = ShadowPlatformAdapter(page_url=mock_page_url, screenshot_dir=tmp_path, headless=True)
+    try:
+        result = adapter.update_menu_sale_status("人民广场店", "可乐", "sold_out")
+        snapshot = adapter.get_snapshot("人民广场店")
+    finally:
+        adapter.close()
+
+    assert result.success is False
+    assert result.submitted is False
+    assert result.shadow_mode is True
+    assert result.error.code == "shadow_operation_not_supported"
+    assert snapshot.items[1].sale_status == "on_sale"
