@@ -42,10 +42,12 @@ D:\code\demov1
 │   ├── test_mock_merchant_page.py
 │   ├── test_mock_web_adapter.py
 │   ├── test_parser.py
+│   ├── test_playwright_dependency.py
 │   ├── test_risk.py
 │   ├── test_static_page.py
 │   ├── test_storage.py
-│   └── test_workflow.py
+│   ├── test_workflow.py
+│   └── test_workflow_adapter_modes.py
 └── docs/
     ├── food-ops-agent/     # Migrated source discussion and PRD artifacts
     └── superpowers/        # Implementation plans, specs, and checkpoints
