@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from food_ops_demo.adapter import FakePlatformAdapter
 from food_ops_demo.audit import AuditLog
 from food_ops_demo.mock_web_adapter import MockWebAdapter
+from food_ops_demo.shadow_adapter import ShadowPlatformAdapter
 from food_ops_demo.models import OperationPlan
 from food_ops_demo.parser import parse_instruction
 from food_ops_demo.risk import validate_plan
@@ -40,16 +41,29 @@ def create_app(
     audit_path: str | Path | None = None,
     database_path: str | Path | None = None,
     mock_web_url: str | None = None,
+    shadow_url: str | None = None,
+    shadow_screenshot_dir: str | Path | None = None,
 ) -> FastAPI:
     database = DemoDatabase(database_path or os.getenv("FOOD_OPS_DATABASE_PATH", "data/demo/demo.sqlite3"))
     fake_adapter = FakePlatformAdapter(database=database)
     mock_url = mock_web_url or os.getenv("FOOD_OPS_MOCK_WEB_URL", "http://127.0.0.1:8765/mock/merchant")
+    shadow_target_url = shadow_url or os.getenv("FOOD_OPS_SHADOW_URL") or mock_url
+    shadow_evidence_dir = (
+        shadow_screenshot_dir
+        or os.getenv("FOOD_OPS_SHADOW_SCREENSHOT_DIR")
+        or "data/demo/shadow-mode-evidence"
+    )
     adapters = {
         "fake": fake_adapter,
         "mock_web": MockWebAdapter(
             page_url=mock_url,
             screenshot_dir=os.getenv("FOOD_OPS_MOCK_WEB_SCREENSHOT_DIR", "data/demo/mock-web-screenshots"),
             headless=os.getenv("FOOD_OPS_MOCK_WEB_HEADLESS", "1") != "0",
+        ),
+        "shadow": ShadowPlatformAdapter(
+            page_url=shadow_target_url,
+            screenshot_dir=shadow_evidence_dir,
+            headless=os.getenv("FOOD_OPS_SHADOW_HEADLESS", "1") != "0",
         ),
     }
     audit_log = AuditLog(audit_path or os.getenv("FOOD_OPS_AUDIT_PATH", "data/demo/audit.jsonl"))
