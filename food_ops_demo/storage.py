@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 import json
 import sqlite3
 from pathlib import Path
 
-from food_ops_demo.models import MenuItem, StoreSnapshot, Task
+from food_ops_demo.models import MenuItem, OperationPlan, StoreSnapshot, Task, new_id, utc_now_iso
 
 
 SEED_STORE_ID = "store_001"
@@ -140,6 +141,97 @@ class DemoDatabase:
             ).fetchall()
         return [Task.model_validate_json(row["task_json"]) for row in rows]
 
+    def enqueue_job(
+        self,
+        batch_id: str,
+        task_id: str,
+        adapter_mode: str,
+        platform_account_id: str,
+        lock_key: str,
+        plan: OperationPlan,
+    ) -> str:
+        job_id = new_id("job")
+        now = utc_now_iso()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO operation_jobs (
+                    job_id, batch_id, task_id, adapter_mode, platform_account_id,
+                    lock_key, state, plan_json, result_json, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, '{}', ?, ?)
+                """,
+                (
+                    job_id,
+                    batch_id,
+                    task_id,
+                    adapter_mode,
+                    platform_account_id,
+                    lock_key,
+                    plan.model_dump_json(),
+                    now,
+                    now,
+                ),
+            )
+        return job_id
+
+    def acquire_next_job(self, worker_id: str, lease_seconds: int) -> dict | None:
+        now = datetime.now(UTC)
+        lease_expires_at = (now + timedelta(seconds=lease_seconds)).isoformat()
+        now_text = now.isoformat()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM operation_jobs
+                WHERE state = 'queued'
+                ORDER BY created_at
+                """
+            ).fetchall()
+            for row in rows:
+                active_lock = conn.execute(
+                    """
+                    SELECT 1
+                    FROM operation_jobs
+                    WHERE lock_key = ?
+                      AND state = 'running'
+                      AND lease_expires_at > ?
+                    LIMIT 1
+                    """,
+                    (row["lock_key"], now_text),
+                ).fetchone()
+                if active_lock is not None:
+                    continue
+                conn.execute(
+                    """
+                    UPDATE operation_jobs
+                    SET state = 'running',
+                        worker_id = ?,
+                        lease_expires_at = ?,
+                        updated_at = ?
+                    WHERE job_id = ?
+                    """,
+                    (worker_id, lease_expires_at, now_text, row["job_id"]),
+                )
+                return dict(conn.execute("SELECT * FROM operation_jobs WHERE job_id = ?", (row["job_id"],)).fetchone())
+        return None
+
+    def complete_job(self, job_id: str, state: str, result: dict) -> None:
+        now = utc_now_iso()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE operation_jobs
+                SET state = ?,
+                    result_json = ?,
+                    worker_id = NULL,
+                    lease_expires_at = NULL,
+                    updated_at = ?
+                WHERE job_id = ?
+                """,
+                (state, json.dumps(result, ensure_ascii=False), now, job_id),
+            )
+
     def _update_menu_field(self, store_name: str, item_name: str, field: str, value: str) -> bool:
         if field not in {"price", "sale_status"}:
             raise ValueError(field)
@@ -203,6 +295,25 @@ class DemoDatabase:
                 CREATE TABLE IF NOT EXISTS tasks (
                     task_id TEXT PRIMARY KEY,
                     task_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS operation_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    batch_id TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    adapter_mode TEXT NOT NULL,
+                    platform_account_id TEXT NOT NULL,
+                    lock_key TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    plan_json TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    worker_id TEXT,
+                    lease_expires_at TEXT,
+                    created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
                 """
