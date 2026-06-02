@@ -218,6 +218,44 @@
       background: var(--surface-2);
     }
 
+    .task-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .task-list article {
+      display: grid;
+      gap: 6px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-2);
+      padding: 10px;
+    }
+
+    .task-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .task-row strong {
+      color: var(--primary-dark);
+      font-size: 13px;
+    }
+
+    .task-row span,
+    .task-id,
+    .task-empty {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .task-target {
+      overflow-wrap: anywhere;
+      font-size: 13px;
+    }
+
     .state {
       color: var(--primary-dark);
       font-weight: 700;
@@ -278,7 +316,10 @@
   <header>
     <div class="topbar">
       <h1>外卖运营 Agent 工作台</h1>
-      <button id="refreshButton" type="button">刷新数据</button>
+      <div class="actions">
+        <button id="resetButton" class="danger" type="button">重置演示</button>
+        <button id="refreshButton" type="button">刷新数据</button>
+      </div>
     </div>
   </header>
 
@@ -330,6 +371,13 @@
         </div>
       </section>
 
+      <section>
+        <div class="panel">
+          <h2 class="panel-title">任务中心</h2>
+          <div id="taskList" class="task-list"></div>
+        </div>
+      </section>
+
       <div class="two-col">
         <section>
           <div class="panel">
@@ -361,10 +409,12 @@
       simulateLogin: document.getElementById('simulateLoginButton'),
       resume: document.getElementById('resumeButton'),
       cancel: document.getElementById('cancelButton'),
+      reset: document.getElementById('resetButton'),
       refresh: document.getElementById('refreshButton'),
       status: document.getElementById('status'),
       preview: document.getElementById('preview'),
       timeline: document.getElementById('timeline'),
+      taskList: document.getElementById('taskList'),
       snapshot: document.getElementById('snapshot'),
       audit: document.getElementById('auditOutput'),
     };
@@ -431,6 +481,23 @@
       `).join('');
     }
 
+    function renderTasks(tasks) {
+      if (!tasks.length) {
+        els.taskList.innerHTML = '<div class="task-empty">暂无任务</div>';
+        return;
+      }
+      els.taskList.innerHTML = tasks.map((task) => `
+        <article>
+          <div class="task-row">
+            <strong>${escapeHtml(task.state)}</strong>
+            <span>${escapeHtml(task.updated_at || task.created_at || '')}</span>
+          </div>
+          <div class="task-target">${escapeHtml(task.instruction || task.plan?.operation_type || task.task_id)}</div>
+          <div class="task-id">${escapeHtml(task.task_id)}</div>
+        </article>
+      `).join('');
+    }
+
     function renderSnapshot(snapshot) {
       els.snapshot.innerHTML = `
         <table>
@@ -458,8 +525,21 @@
       updateButtons();
     }
 
+    function clearCurrentTask() {
+      state.taskId = null;
+      state.taskState = null;
+      renderPreview(null, {});
+      renderTimeline(null);
+      updateButtons();
+    }
+
     async function loadSnapshot() {
       renderSnapshot(await request('/api/demo/snapshot'));
+    }
+
+    async function loadTasks() {
+      const data = await request('/api/demo/tasks');
+      renderTasks(data.items || []);
     }
 
     async function loadAudit() {
@@ -485,6 +565,7 @@
           body: JSON.stringify({ plan: parsed.plan, preview: parsed.preview }),
         });
         renderTask(task);
+        await loadTasks();
         setStatus('计划已生成，等待确认。');
       } catch (error) {
         setStatus(error.message, true);
@@ -495,6 +576,7 @@
       const task = await request(`/api/demo/tasks/${state.taskId}/confirm`, { method: 'POST' });
       renderTask(task);
       await loadSnapshot();
+      await loadTasks();
       await loadAudit();
       setStatus(task.state === 'succeeded' ? '执行成功。' : '执行未完成。', task.state !== 'succeeded');
     }
@@ -505,6 +587,7 @@
         body: JSON.stringify({ type: 'login_expired' }),
       });
       renderTask(task);
+      await loadTasks();
       setStatus('任务需要人工介入。');
     }
 
@@ -512,6 +595,7 @@
       const task = await request(`/api/demo/tasks/${state.taskId}/resume`, { method: 'POST' });
       renderTask(task);
       await loadSnapshot();
+      await loadTasks();
       await loadAudit();
       setStatus(task.state === 'succeeded' ? '任务已继续并完成。' : '任务未完成。', task.state !== 'succeeded');
     }
@@ -519,7 +603,22 @@
     async function cancelTask() {
       const task = await request(`/api/demo/tasks/${state.taskId}/cancel`, { method: 'POST' });
       renderTask(task);
+      await loadTasks();
       setStatus('任务已取消。');
+    }
+
+    async function resetDemo() {
+      try {
+        setStatus('');
+        await request('/api/demo/reset', { method: 'POST' });
+        clearCurrentTask();
+        await loadSnapshot();
+        await loadTasks();
+        await loadAudit();
+        setStatus('演示数据已重置。');
+      } catch (error) {
+        setStatus(error.message, true);
+      }
     }
 
     function formatChanges(changes) {
@@ -557,12 +656,15 @@
     els.simulateLogin.addEventListener('click', simulateLoginExpired);
     els.resume.addEventListener('click', resumeTask);
     els.cancel.addEventListener('click', cancelTask);
+    els.reset.addEventListener('click', resetDemo);
     els.refresh.addEventListener('click', async () => {
       await loadSnapshot();
+      await loadTasks();
       await loadAudit();
     });
 
     loadSnapshot();
+    loadTasks();
     loadAudit();
   </script>
 </body>

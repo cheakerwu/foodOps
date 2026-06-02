@@ -54,6 +54,11 @@ def create_app(audit_path: str | Path | None = None, database_path: str | Path |
     def snapshot() -> dict[str, Any]:
         return adapter.get_snapshot(DEFAULT_STORE_NAME).model_dump(mode="json")
 
+    @app.post("/api/demo/reset")
+    def reset_demo() -> dict[str, str]:
+        database.reset_demo_data()
+        return {"status": "reset"}
+
     @app.post("/api/demo/parse")
     def parse(payload: ParseRequest) -> dict[str, Any]:
         parsed = parse_instruction(payload.text)

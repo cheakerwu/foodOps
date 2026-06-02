@@ -70,6 +70,23 @@ def test_task_list_endpoint_returns_recent_tasks(tmp_path):
     assert response.json()["items"][0]["task_id"] == created["task_id"]
 
 
+def test_reset_demo_data_restores_snapshot(tmp_path):
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
+    parsed = client.post("/api/demo/parse", json={"text": "把人民广场店的招牌牛肉饭改成 29.9"}).json()
+    created = client.post("/api/demo/tasks", json={"plan": parsed["plan"], "preview": parsed["preview"]}).json()
+    confirmed = client.post(f"/api/demo/tasks/{created['task_id']}/confirm")
+
+    reset = client.post("/api/demo/reset")
+    snapshot = client.get("/api/demo/snapshot")
+
+    assert confirmed.status_code == 200
+    assert confirmed.json()["state"] == "succeeded"
+    assert reset.status_code == 200
+    assert reset.json() == {"status": "reset"}
+    assert snapshot.status_code == 200
+    assert snapshot.json()["items"][0]["price"] == "32.00"
+
+
 def test_invalid_parse_returns_structured_error(tmp_path):
     client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
 

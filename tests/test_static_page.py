@@ -15,6 +15,14 @@ def test_static_page_contains_core_controls():
     assert "模拟登录失效" in html
 
 
+def test_static_page_contains_reset_and_task_center():
+    html = Path("food_ops_demo/static/index.html").read_text(encoding="utf-8")
+
+    assert 'id="resetButton"' in html
+    assert 'id="taskList"' in html
+    assert "任务中心" in html
+
+
 def test_root_serves_static_page(tmp_path):
     client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
 
