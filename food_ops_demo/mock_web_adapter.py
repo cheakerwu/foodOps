@@ -56,13 +56,37 @@ class MockWebAdapter(BasePlatformAdapter):
         return self._result_from_status()
 
     def update_menu_sale_status(self, store_name: str, item_name: str, sale_status: str) -> OperationResult:
-        return _unsupported("menu.update_sale_status")
+        item = self._find_one(store_name, item_name)
+        if item is None:
+            return _not_found()
+        if sale_status not in {"on_sale", "off_sale", "sold_out"}:
+            return OperationResult(
+                success=False,
+                error=ErrorDetail(code="invalid_sale_status", message=f"不支持售卖状态：{sale_status}"),
+            )
+        page = self._ensure_page()
+        page.locator(f'[data-testid="status-{sale_status}-{item.item_id}"]').click()
+        return self._result_from_status()
 
     def update_business_hours(self, store_name: str, business_hours: list[dict[str, str]]) -> OperationResult:
-        return _unsupported("store.update_business_hours")
+        if len(business_hours) != 1:
+            return OperationResult(
+                success=False,
+                error=ErrorDetail(code="unsupported_business_hours", message="Mock 后台只支持一个营业时间段。"),
+            )
+        self.get_snapshot(store_name)
+        page = self._ensure_page()
+        page.locator('[data-testid="business-hours-start-input"]').fill(business_hours[0]["start"])
+        page.locator('[data-testid="business-hours-end-input"]').fill(business_hours[0]["end"])
+        page.locator('[data-testid="save-hours-button"]').click()
+        return self._result_from_status()
 
     def update_store_phone(self, store_name: str, phone: str) -> OperationResult:
-        return _unsupported("store.update_phone")
+        self.get_snapshot(store_name)
+        page = self._ensure_page()
+        page.locator('[data-testid="store-phone-input"]').fill(phone)
+        page.locator('[data-testid="save-phone-button"]').click()
+        return self._result_from_status()
 
     def _ensure_page(self) -> Page:
         if self._page is not None:
@@ -113,7 +137,7 @@ def _raw_to_snapshot(raw: dict) -> StoreSnapshot:
                 store_id=raw.get("storeId", ""),
                 name=item_data["name"],
                 price=f'{item_data["price"]:.2f}',
-                sale_status="on_sale" if item_data.get("onSale", True) else "off_sale",
+                sale_status=item_data.get("saleStatus", "on_sale"),
                 image="",
             )
         )

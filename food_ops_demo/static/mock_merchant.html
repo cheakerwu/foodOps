@@ -100,7 +100,9 @@
               <td><span class="status-on" data-testid="status-label-item_001">在售</span></td>
               <td>
                 <button class="btn btn-primary" data-testid="save-price-button-item_001" onclick="savePrice('item_001')">保存价格</button>
-                <button class="btn btn-danger" data-testid="toggle-sale-button-item_001" onclick="toggleSale('item_001')">下架</button>
+                <button class="btn btn-outline" data-testid="status-on_sale-item_001" onclick="setSaleStatus('item_001', 'on_sale')">在售</button>
+                <button class="btn btn-outline" data-testid="status-off_sale-item_001" onclick="setSaleStatus('item_001', 'off_sale')">下架</button>
+                <button class="btn btn-danger" data-testid="status-sold_out-item_001" onclick="setSaleStatus('item_001', 'sold_out')">售罄</button>
               </td>
             </tr>
             <tr data-testid="item-row-item_002">
@@ -110,7 +112,9 @@
               <td><span class="status-on" data-testid="status-label-item_002">在售</span></td>
               <td>
                 <button class="btn btn-primary" data-testid="save-price-button-item_002" onclick="savePrice('item_002')">保存价格</button>
-                <button class="btn btn-danger" data-testid="toggle-sale-button-item_002" onclick="toggleSale('item_002')">下架</button>
+                <button class="btn btn-outline" data-testid="status-on_sale-item_002" onclick="setSaleStatus('item_002', 'on_sale')">在售</button>
+                <button class="btn btn-outline" data-testid="status-off_sale-item_002" onclick="setSaleStatus('item_002', 'off_sale')">下架</button>
+                <button class="btn btn-danger" data-testid="status-sold_out-item_002" onclick="setSaleStatus('item_002', 'sold_out')">售罄</button>
               </td>
             </tr>
             <tr data-testid="item-row-item_003">
@@ -120,7 +124,9 @@
               <td><span class="status-on" data-testid="status-label-item_003">在售</span></td>
               <td>
                 <button class="btn btn-primary" data-testid="save-price-button-item_003" onclick="savePrice('item_003')">保存价格</button>
-                <button class="btn btn-danger" data-testid="toggle-sale-button-item_003" onclick="toggleSale('item_003')">下架</button>
+                <button class="btn btn-outline" data-testid="status-on_sale-item_003" onclick="setSaleStatus('item_003', 'on_sale')">在售</button>
+                <button class="btn btn-outline" data-testid="status-off_sale-item_003" onclick="setSaleStatus('item_003', 'off_sale')">下架</button>
+                <button class="btn btn-danger" data-testid="status-sold_out-item_003" onclick="setSaleStatus('item_003', 'sold_out')">售罄</button>
               </td>
             </tr>
           </tbody>
@@ -141,9 +147,9 @@
         phone: "021-88888888",
         businessHours: [{ start: "09:30", end: "21:30" }],
         items: {
-          item_001: { name: "招牌牛肉饭", price: 32.0, onSale: true },
-          item_002: { name: "可乐", price: 6.0, onSale: true },
-          item_003: { name: "宫保鸡丁", price: 28.0, onSale: true },
+          item_001: { name: "招牌牛肉饭", price: 32.0, saleStatus: "on_sale" },
+          item_002: { name: "可乐", price: 6.0, saleStatus: "on_sale" },
+          item_003: { name: "宫保鸡丁", price: 28.0, saleStatus: "on_sale" },
         },
         scenario: null,
       };
@@ -229,22 +235,23 @@
         showToast(state.items[itemId].name + " 价格已保存: " + price.toFixed(2), false);
       }
 
-      function toggleSale(itemId) {
+      function setSaleStatus(itemId, status) {
         if (!guardSave()) return;
         var item = state.items[itemId];
-        item.onSale = !item.onSale;
+        item.saleStatus = status;
         var label = document.querySelector('[data-testid="status-label-' + itemId + '"]');
-        var btn = document.querySelector('[data-testid="toggle-sale-button-' + itemId + '"]');
-        if (item.onSale) {
+        if (status === "on_sale") {
           label.textContent = "在售";
           label.className = "status-on";
-          btn.textContent = "下架";
-        } else {
+        } else if (status === "off_sale") {
           label.textContent = "已下架";
           label.className = "status-off";
-          btn.textContent = "上架";
+        } else if (status === "sold_out") {
+          label.textContent = "已售罄";
+          label.className = "status-off";
         }
-        showToast(item.name + (item.onSale ? " 已上架" : " 已下架"), false);
+        var statusText = status === "on_sale" ? "在售" : status === "off_sale" ? "下架" : "售罄";
+        showToast(item.name + " 状态已更新: " + statusText, false);
       }
 
       function getSnapshot() {
@@ -275,7 +282,7 @@
       window.savePhone = savePhone;
       window.saveHours = saveHours;
       window.savePrice = savePrice;
-      window.toggleSale = toggleSale;
+      window.setSaleStatus = setSaleStatus;
     })();
   </script>
 </body>

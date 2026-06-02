@@ -34,3 +34,37 @@ def test_mock_web_adapter_updates_price_through_page(adapter):
 
     assert result.success is True
     assert item.price == "29.90"
+
+
+def test_mock_web_adapter_updates_sale_status_through_page(adapter):
+    result = adapter.update_menu_sale_status("人民广场店", "可乐", "sold_out")
+    item = adapter.find_menu_items("人民广场店", "可乐")[0]
+
+    assert result.success is True
+    assert item.sale_status == "sold_out"
+
+
+def test_mock_web_adapter_updates_store_phone_through_page(adapter):
+    result = adapter.update_store_phone("人民广场店", "021-66668888")
+    snapshot = adapter.get_snapshot("人民广场店")
+
+    assert result.success is True
+    assert snapshot.phone == "021-66668888"
+
+
+def test_mock_web_adapter_updates_business_hours_through_page(adapter):
+    result = adapter.update_business_hours("人民广场店", [{"start": "10:00", "end": "21:00"}])
+    snapshot = adapter.get_snapshot("人民广场店")
+
+    assert result.success is True
+    assert snapshot.business_hours == [{"start": "10:00", "end": "21:00"}]
+
+
+def test_mock_web_adapter_saves_screenshot_after_success(mock_page_url, tmp_path):
+    adapter = MockWebAdapter(page_url=mock_page_url, screenshot_dir=tmp_path, headless=True)
+    try:
+        adapter.update_menu_price("人民广场店", "招牌牛肉饭", "29.90")
+    finally:
+        adapter.close()
+
+    assert (tmp_path / "last-success.png").exists()

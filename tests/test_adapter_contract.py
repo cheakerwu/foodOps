@@ -1,14 +1,30 @@
+from pathlib import Path
+
 import pytest
 
 from food_ops_demo.adapter import FakePlatformAdapter
+from food_ops_demo.mock_web_adapter import MockWebAdapter
 from food_ops_demo.storage import DemoDatabase
 
 
-@pytest.fixture(params=["memory", "sqlite"], ids=["memory", "sqlite"])
+@pytest.fixture(params=["memory", "sqlite", "mock_web"], ids=["memory", "sqlite", "mock_web"])
 def adapter(request, tmp_path):
     if request.param == "memory":
-        return FakePlatformAdapter()
-    return FakePlatformAdapter(database=DemoDatabase(tmp_path / "demo.sqlite3"))
+        yield FakePlatformAdapter()
+        return
+    if request.param == "sqlite":
+        yield FakePlatformAdapter(database=DemoDatabase(tmp_path / "demo.sqlite3"))
+        return
+
+    adapter = MockWebAdapter(
+        page_url=Path("food_ops_demo/static/mock_merchant.html").resolve().as_uri(),
+        screenshot_dir=tmp_path / "screenshots",
+        headless=True,
+    )
+    try:
+        yield adapter
+    finally:
+        adapter.close()
 
 
 def test_adapter_contract_updates_menu_price(adapter):
