@@ -91,6 +91,31 @@ http://127.0.0.1:8765
 7. 确认任务执行成功，任务中心出现 `mock_web` 任务。
 8. 打开 `data/demo/mock-web-screenshots/`，确认存在最新执行截图。
 
+## Phase 4 Shadow Mode 演示流程
+
+Shadow Mode 用于真实后台接入前的安全验证：系统会打开目标后台页面、读取当前数据、定位并预填目标值、截图留证，然后停在 `pending_review`。系统不会点击保存或提交。
+
+本地演示默认指向 mock 商家后台：
+
+```powershell
+$env:FOOD_OPS_SHADOW_URL='http://127.0.0.1:8765/mock/merchant'
+$env:FOOD_OPS_SHADOW_SCREENSHOT_DIR='data/demo/shadow-mode-evidence'
+$env:FOOD_OPS_SHADOW_HEADLESS='1'
+& 'E:\anaconda\envs\jobhellper\python.exe' -m uvicorn food_ops_demo.asgi:app --host 127.0.0.1 --port 8765
+```
+
+浏览器打开 `http://127.0.0.1:8765/` 后：
+
+1. 执行模式选择 `ShadowMode`。
+2. 输入 `把人民广场店的招牌牛肉饭改成 29.9`。
+3. 点击 `生成计划`。
+4. 点击 `开始预填`。
+5. 任务状态应停在 `pending_review`。
+6. `data/demo/shadow-mode-evidence/shadow-prefill-price.png` 应显示目标价格已预填为 `29.90`。
+7. mock 门店快照仍应保留原价格 `32.00`，证明没有提交。
+
+如果要指向真实后台，只修改 `FOOD_OPS_SHADOW_URL`。真实后台 Shadow Mode 仍然只预填不提交，提交动作必须由人工在后台完成或放弃。
+
 ## 示例指令
 
 ```text

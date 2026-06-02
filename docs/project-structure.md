@@ -12,7 +12,7 @@
 自然语言指令 -> 标准操作计划 -> 风险校验 -> 人工确认 -> FakeAdapter 执行 -> 回读校验 -> 审计留痕
 ```
 
-当前版本支持 FakeAdapter 和 MockWebAdapter 两种执行模式，其中 MockWebAdapter 通过 Playwright 驱动本地 mock 商家后台页面，验证未来真实 RPA 适配器的执行边界。不接真实外卖平台、真实 LLM 或多用户权限体系。
+当前版本支持 FakeAdapter、MockWebAdapter 和 ShadowMode 三种执行模式。ShadowMode 只读取、定位、预填和截图，不点击保存或提交。不接真实外卖平台、真实 LLM 或多用户权限体系。
 
 ## 目录结构
 
@@ -28,6 +28,7 @@ D:\code\demov1
 │   ├── audit.py            # JSONL audit log reader/writer
 │   ├── models.py           # Pydantic request, plan, task, snapshot models
 │   ├── mock_web_adapter.py # MockWebAdapter with Playwright fault injection
+│   ├── shadow_adapter.py   # ShadowPlatformAdapter: read-only prefill with screenshots
 │   ├── parser.py           # Rule-based Chinese instruction parser
 │   ├── risk.py             # Risk validation and preview generation
 │   ├── storage.py          # SQLite demo data and task persistence
@@ -64,6 +65,7 @@ D:\code\demov1
 - `food_ops_demo.risk`：生成风险等级、审批要求和变更预览。
 - `food_ops_demo.static.index.html`：本地工作台页面，包含指令输入、人工确认、任务中心、快照和审计结果。
 - `food_ops_demo.mock_web_adapter.MockWebAdapter`：通过 Playwright 驱动本地 mock 商家后台页面，验证未来真实 RPA 适配器的执行边界。
+- `food_ops_demo.shadow_adapter.ShadowPlatformAdapter`：Phase 4 的只读/预填适配器，通过 Playwright 打开配置的后台页面，预填低风险输入并截图，明确返回 `submitted=false`。
 - `food_ops_demo.static.mock_merchant.html`：本地仿真商家后台，用于 Playwright 点击、截图和异常注入。
 
 ## 已支持指令
@@ -117,6 +119,8 @@ tests/__pycache__/
 ```
 
 其中 `data/demo/` 存放演示数据库、审计日志、服务 PID 和验收截图。它们用于本地回放，不作为源码提交。
+
+- `data/demo/shadow-mode-evidence/`：本地 Shadow Mode 截图证据目录，不进入 Git。
 
 ## 后续开发建议
 
