@@ -81,7 +81,7 @@ class ShadowPlatformAdapter(BasePlatformAdapter):
     def update_business_hours(self, store_name: str, business_hours: list[dict[str, str]]) -> OperationResult:
         if len(business_hours) != 1:
             return self._shadow_error("unsupported_business_hours", "Shadow Mode 只支持一个营业时间段预填。")
-        self.get_snapshot(store_name)
+        snapshot = self.get_snapshot(store_name)
         page = self._ensure_page()
         page.locator('[data-testid="business-hours-start-input"]').fill(business_hours[0]["start"])
         page.locator('[data-testid="business-hours-end-input"]').fill(business_hours[0]["end"])
@@ -95,6 +95,7 @@ class ShadowPlatformAdapter(BasePlatformAdapter):
                 "operation_type": "store.update_business_hours",
                 "target_url": self.page_url,
                 "store_name": store_name,
+                "original_value": snapshot.business_hours,
                 "intended_value": business_hours,
                 "screenshot_path": str(screenshot_path) if screenshot_path else "",
             },
