@@ -46,6 +46,12 @@ def create_app(audit_path: str | Path | None = None, database_path: str | Path |
     def index() -> str:
         return static_page.read_text(encoding="utf-8")
 
+    mock_merchant_page = Path(__file__).parent / "static" / "mock_merchant.html"
+
+    @app.get("/mock/merchant", response_class=HTMLResponse)
+    def mock_merchant() -> str:
+        return mock_merchant_page.read_text(encoding="utf-8")
+
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}

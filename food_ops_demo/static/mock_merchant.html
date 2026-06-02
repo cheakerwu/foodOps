@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock 商家后台 - 人民广场店</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; }
+    .header { background: #ff6600; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header .store-name { font-size: 14px; opacity: 0.9; }
+    .container { max-width: 960px; margin: 24px auto; padding: 0 16px; }
+    .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; margin-bottom: 16px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+    .form-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .form-row label { min-width: 100px; font-size: 14px; color: #666; }
+    .form-row input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+    .form-row input:focus { outline: none; border-color: #ff6600; }
+    .btn { padding: 6px 16px; border: none; border-radius: 4px; font-size: 13px; cursor: pointer; }
+    .btn-primary { background: #ff6600; color: #fff; }
+    .btn-primary:hover { background: #e55b00; }
+    .btn-danger { background: #e74c3c; color: #fff; }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-outline { background: transparent; border: 1px solid #ddd; color: #666; }
+    .btn-outline:hover { border-color: #999; color: #333; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 14px; }
+    th { color: #999; font-weight: 500; font-size: 13px; }
+    .status-on { color: #27ae60; font-weight: 500; }
+    .status-off { color: #e74c3c; font-weight: 500; }
+    .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 6px; color: #fff; font-size: 14px; z-index: 1000; display: none; }
+    .toast-success { background: #27ae60; }
+    .toast-error { background: #e74c3c; }
+    .scenario-bar { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+    .scenario-bar span { font-size: 14px; color: #856404; }
+    .scenario-bar select { padding: 4px 8px; border: 1px solid #ffc107; border-radius: 4px; font-size: 13px; }
+    .scenario-bar button { padding: 4px 12px; }
+  </style>
+</head>
+<body>
+  <div id="mockMerchantApp">
+    <div class="header">
+      <h1>Mock 商家后台</h1>
+      <span class="store-name" data-testid="store-name-label">人民广场店</span>
+    </div>
+
+    <div class="container">
+      <div class="scenario-bar">
+        <span>故障注入：</span>
+        <select id="scenarioSelect" data-testid="scenario-select">
+          <option value="">无</option>
+          <option value="auth_required">登录过期 (auth_required)</option>
+          <option value="save_failure">保存失败 (save_failure)</option>
+        </select>
+        <button class="btn btn-outline" data-testid="apply-scenario-button" onclick="applyScenario()">应用</button>
+        <button class="btn btn-outline" data-testid="reset-scenario-button" onclick="resetScenario()">重置</button>
+      </div>
+
+      <div id="alertBanner" style="display:none" class="card" data-testid="alert-banner">
+        <p id="alertMessage" style="color:#e74c3c;font-weight:500;"></p>
+      </div>
+
+      <!-- Store Settings -->
+      <div class="card">
+        <h2>门店设置</h2>
+        <div class="form-row">
+          <label>门店电话</label>
+          <input type="text" id="storePhone" data-testid="store-phone-input" value="021-88888888" />
+          <button class="btn btn-primary" data-testid="save-phone-button" onclick="savePhone()">保存电话</button>
+        </div>
+        <div class="form-row">
+          <label>营业开始</label>
+          <input type="time" id="businessHoursStart" data-testid="business-hours-start-input" value="09:30" />
+          <label>营业结束</label>
+          <input type="time" id="businessHoursEnd" data-testid="business-hours-end-input" value="21:30" />
+          <button class="btn btn-primary" data-testid="save-hours-button" onclick="saveHours()">保存营业时间</button>
+        </div>
+      </div>
+
+      <!-- Menu Management -->
+      <div class="card">
+        <h2>菜品管理</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>菜品ID</th>
+              <th>名称</th>
+              <th>价格 (元)</th>
+              <th>在售状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-testid="item-row-item_001">
+              <td>item_001</td>
+              <td>招牌牛肉饭</td>
+              <td><input type="number" step="0.01" data-testid="price-input-item_001" value="32.00" style="width:80px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;" /></td>
+              <td><span class="status-on" data-testid="status-label-item_001">在售</span></td>
+              <td>
+                <button class="btn btn-primary" data-testid="save-price-button-item_001" onclick="savePrice('item_001')">保存价格</button>
+                <button class="btn btn-danger" data-testid="toggle-sale-button-item_001" onclick="toggleSale('item_001')">下架</button>
+              </td>
+            </tr>
+            <tr data-testid="item-row-item_002">
+              <td>item_002</td>
+              <td>可乐</td>
+              <td><input type="number" step="0.01" data-testid="price-input-item_002" value="6.00" style="width:80px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;" /></td>
+              <td><span class="status-on" data-testid="status-label-item_002">在售</span></td>
+              <td>
+                <button class="btn btn-primary" data-testid="save-price-button-item_002" onclick="savePrice('item_002')">保存价格</button>
+                <button class="btn btn-danger" data-testid="toggle-sale-button-item_002" onclick="toggleSale('item_002')">下架</button>
+              </td>
+            </tr>
+            <tr data-testid="item-row-item_003">
+              <td>item_003</td>
+              <td>宫保鸡丁</td>
+              <td><input type="number" step="0.01" data-testid="price-input-item_003" value="28.00" style="width:80px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;" /></td>
+              <td><span class="status-on" data-testid="status-label-item_003">在售</span></td>
+              <td>
+                <button class="btn btn-primary" data-testid="save-price-button-item_003" onclick="savePrice('item_003')">保存价格</button>
+                <button class="btn btn-danger" data-testid="toggle-sale-button-item_003" onclick="toggleSale('item_003')">下架</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var state = {
+        storeId: "store_001",
+        storeName: "人民广场店",
+        phone: "021-88888888",
+        businessHours: [{ start: "09:30", end: "21:30" }],
+        items: {
+          item_001: { name: "招牌牛肉饭", price: 32.0, onSale: true },
+          item_002: { name: "可乐", price: 6.0, onSale: true },
+          item_003: { name: "宫保鸡丁", price: 28.0, onSale: true },
+        },
+        scenario: null,
+      };
+
+      function showToast(message, isError) {
+        var toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.className = "toast " + (isError ? "toast-error" : "toast-success");
+        toast.style.display = "block";
+        setTimeout(function () {
+          toast.style.display = "none";
+        }, 2000);
+      }
+
+      function showBanner(message) {
+        var banner = document.getElementById("alertBanner");
+        var msg = document.getElementById("alertMessage");
+        msg.textContent = message;
+        banner.style.display = "block";
+      }
+
+      function hideBanner() {
+        document.getElementById("alertBanner").style.display = "none";
+      }
+
+      function applyScenario() {
+        var select = document.getElementById("scenarioSelect");
+        var scenario = select.value;
+        if (!scenario) {
+          resetScenario();
+          return;
+        }
+        state.scenario = scenario;
+        if (scenario === "auth_required") {
+          showBanner("登录已过期，请人工处理。");
+        } else if (scenario === "save_failure") {
+          showBanner("保存失败，请稍后重试。");
+        }
+      }
+
+      function resetScenario() {
+        state.scenario = null;
+        document.getElementById("scenarioSelect").value = "";
+        hideBanner();
+      }
+
+      function guardSave() {
+        if (state.scenario === "auth_required") {
+          showToast("登录已过期，请人工处理。", true);
+          return false;
+        }
+        if (state.scenario === "save_failure") {
+          showToast("保存失败，请稍后重试。", true);
+          return false;
+        }
+        return true;
+      }
+
+      function savePhone() {
+        if (!guardSave()) return;
+        var phone = document.getElementById("storePhone").value;
+        state.phone = phone;
+        showToast("电话已保存: " + phone, false);
+      }
+
+      function saveHours() {
+        if (!guardSave()) return;
+        var start = document.getElementById("businessHoursStart").value;
+        var end = document.getElementById("businessHoursEnd").value;
+        state.businessHours = [{ start: start, end: end }];
+        showToast("营业时间已保存: " + start + " - " + end, false);
+      }
+
+      function savePrice(itemId) {
+        if (!guardSave()) return;
+        var input = document.querySelector('[data-testid="price-input-' + itemId + '"]');
+        var price = parseFloat(input.value);
+        if (isNaN(price) || price < 0) {
+          showToast("请输入有效的价格", true);
+          return;
+        }
+        state.items[itemId].price = price;
+        showToast(state.items[itemId].name + " 价格已保存: " + price.toFixed(2), false);
+      }
+
+      function toggleSale(itemId) {
+        if (!guardSave()) return;
+        var item = state.items[itemId];
+        item.onSale = !item.onSale;
+        var label = document.querySelector('[data-testid="status-label-' + itemId + '"]');
+        var btn = document.querySelector('[data-testid="toggle-sale-button-' + itemId + '"]');
+        if (item.onSale) {
+          label.textContent = "在售";
+          label.className = "status-on";
+          btn.textContent = "下架";
+        } else {
+          label.textContent = "已下架";
+          label.className = "status-off";
+          btn.textContent = "上架";
+        }
+        showToast(item.name + (item.onSale ? " 已上架" : " 已下架"), false);
+      }
+
+      function getSnapshot() {
+        return JSON.parse(JSON.stringify(state));
+      }
+
+      function setScenario(scenario) {
+        state.scenario = scenario;
+        document.getElementById("scenarioSelect").value = scenario || "";
+        if (scenario === "auth_required") {
+          showBanner("登录已过期，请人工处理。");
+        } else if (scenario === "save_failure") {
+          showBanner("保存失败，请稍后重试。");
+        } else {
+          hideBanner();
+        }
+      }
+
+      // Expose API on window.__mockMerchant
+      window.__mockMerchant = {};
+      window.__mockMerchant.getSnapshot = getSnapshot;
+      window.__mockMerchant.setScenario = setScenario;
+      window.__mockMerchant.reset = resetScenario;
+
+      // Wire up global handlers for inline onclick
+      window.applyScenario = applyScenario;
+      window.resetScenario = resetScenario;
+      window.savePhone = savePhone;
+      window.saveHours = saveHours;
+      window.savePrice = savePrice;
+      window.toggleSale = toggleSale;
+    })();
+  </script>
+</body>
+</html>
