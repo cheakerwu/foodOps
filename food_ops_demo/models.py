@@ -57,6 +57,9 @@ class StoreSnapshot(BaseModel):
 class OperationResult(BaseModel):
     success: bool
     error: ErrorDetail | None = None
+    submitted: bool = True
+    shadow_mode: bool = False
+    evidence: dict[str, Any] = Field(default_factory=dict)
 
 
 class ValidationResult(BaseModel):
@@ -83,6 +86,7 @@ class Task(BaseModel):
     before_snapshot: dict[str, Any] = Field(default_factory=dict)
     after_snapshot: dict[str, Any] = Field(default_factory=dict)
     result: dict[str, Any] = Field(default_factory=dict)
+    shadow_evidence: dict[str, Any] = Field(default_factory=dict)
     error: ErrorDetail | None = None
     manual_intervention_type: str | None = None
     created_at: str = Field(default_factory=utc_now_iso)
