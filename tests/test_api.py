@@ -176,3 +176,17 @@ def test_shadow_mode_parse_create_confirm_flow(tmp_path):
     assert confirmed["result"]["shadow_mode"] is True
     assert confirmed["shadow_evidence"]["intended_value"] == "29.90"
     assert (tmp_path / "shadow-evidence" / "shadow-prefill-price.png").exists()
+
+
+def test_parse_rejects_unknown_adapter_mode_without_throwing(tmp_path):
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
+
+    response = client.post(
+        "/api/demo/parse",
+        json={"text": "把人民广场店的招牌牛肉饭改成 29.9", "adapter_mode": "missing"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["plan"] is None
+    assert body["errors"][0]["code"] == "adapter_mode_not_found"

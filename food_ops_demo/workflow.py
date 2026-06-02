@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from food_ops_demo.adapter import BasePlatformAdapter, FakePlatformAdapter
+from food_ops_demo.adapter_registry import AdapterRegistry
 from food_ops_demo.audit import AuditLog
 from food_ops_demo.models import ErrorDetail, OperationPlan, OperationResult, Task, TimelineEvent, utc_now_iso
 from food_ops_demo.storage import DemoDatabase
@@ -16,9 +17,11 @@ class TaskManager:
         audit_log: AuditLog | None = None,
         database: DemoDatabase | None = None,
         adapters: dict[str, BasePlatformAdapter] | None = None,
+        adapter_registry: AdapterRegistry | None = None,
         default_adapter_mode: str = "fake",
     ) -> None:
         default_adapter = adapter or FakePlatformAdapter(database=database)
+        self.adapter_registry = adapter_registry
         self.adapters = adapters or {default_adapter_mode: default_adapter}
         self.default_adapter_mode = default_adapter_mode
         self.adapter = self.adapters[self.default_adapter_mode]
@@ -97,12 +100,22 @@ class TaskManager:
         return self.adapters.get(task.adapter_mode)
 
     def _execute(self, task: Task, skip_queue: bool = False) -> Task:
-        adapter = self._adapter_for(task)
-        if adapter is None:
-            self._fail(task, "adapter_mode_not_found", f"找不到执行模式：{task.adapter_mode}")
-            self._persist(task)
-            return self._copy(task)
+        if self.adapter_registry is None:
+            adapter = self._adapter_for(task)
+            if adapter is None:
+                self._fail(task, "adapter_mode_not_found", f"找不到执行模式：{task.adapter_mode}")
+                self._persist(task)
+                return self._copy(task)
+            return self._execute_with_adapter(task, adapter, skip_queue=skip_queue)
 
+        with self.adapter_registry.use(task.adapter_mode) as adapter:
+            if adapter is None:
+                self._fail(task, "adapter_mode_not_found", f"找不到执行模式：{task.adapter_mode}")
+                self._persist(task)
+                return self._copy(task)
+            return self._execute_with_adapter(task, adapter, skip_queue=skip_queue)
+
+    def _execute_with_adapter(self, task: Task, adapter: BasePlatformAdapter, skip_queue: bool = False) -> Task:
         if not skip_queue:
             self._set_state(task, "queued", "任务已进入执行队列。")
             if task.adapter_mode == "shadow":

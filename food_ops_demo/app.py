@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from food_ops_demo.adapter import FakePlatformAdapter
+from food_ops_demo.adapter_registry import AdapterRegistry
 from food_ops_demo.audit import AuditLog
 from food_ops_demo.mock_web_adapter import MockWebAdapter
 from food_ops_demo.shadow_adapter import ShadowPlatformAdapter
@@ -53,23 +54,26 @@ def create_app(
         or os.getenv("FOOD_OPS_SHADOW_SCREENSHOT_DIR")
         or "data/demo/shadow-mode-evidence"
     )
-    adapters = {
-        "fake": fake_adapter,
-        "mock_web": MockWebAdapter(
-            page_url=mock_url,
-            screenshot_dir=os.getenv("FOOD_OPS_MOCK_WEB_SCREENSHOT_DIR", "data/demo/mock-web-screenshots"),
-            headless=os.getenv("FOOD_OPS_MOCK_WEB_HEADLESS", "1") != "0",
-        ),
-        "shadow": ShadowPlatformAdapter(
-            page_url=shadow_target_url,
-            screenshot_dir=shadow_evidence_dir,
-            headless=os.getenv("FOOD_OPS_SHADOW_HEADLESS", "1") != "0",
-        ),
-    }
+    adapter_registry = AdapterRegistry(
+        {
+            "fake": lambda: fake_adapter,
+            "mock_web": lambda: MockWebAdapter(
+                page_url=mock_url,
+                screenshot_dir=os.getenv("FOOD_OPS_MOCK_WEB_SCREENSHOT_DIR", "data/demo/mock-web-screenshots"),
+                headless=os.getenv("FOOD_OPS_MOCK_WEB_HEADLESS", "1") != "0",
+            ),
+            "shadow": lambda: ShadowPlatformAdapter(
+                page_url=shadow_target_url,
+                screenshot_dir=shadow_evidence_dir,
+                headless=os.getenv("FOOD_OPS_SHADOW_HEADLESS", "1") != "0",
+            ),
+        },
+        shared_modes={"fake"},
+    )
     audit_log = AuditLog(audit_path or os.getenv("FOOD_OPS_AUDIT_PATH", "data/demo/audit.jsonl"))
     manager = TaskManager(
         adapter=fake_adapter,
-        adapters=adapters,
+        adapter_registry=adapter_registry,
         default_adapter_mode="fake",
         audit_log=audit_log,
         database=database,
@@ -103,23 +107,29 @@ def create_app(
 
     @app.post("/api/demo/parse")
     def parse(payload: ParseRequest) -> dict[str, Any]:
-        selected_adapter = adapters.get(payload.adapter_mode)
-        if selected_adapter is None:
-            return {
-                "plan": None,
-                "preview": {},
-                "errors": [{"code": "adapter_mode_not_found", "message": f"找不到执行模式：{payload.adapter_mode}"}],
-            }
-        parsed = parse_instruction(payload.text)
-        if parsed.errors or parsed.plan is None:
-            return {"plan": None, "preview": {}, "errors": [error.model_dump(mode="json") for error in parsed.errors]}
+        with adapter_registry.use(payload.adapter_mode) as selected_adapter:
+            if selected_adapter is None:
+                return {
+                    "plan": None,
+                    "preview": {},
+                    "errors": [
+                        {"code": "adapter_mode_not_found", "message": f"找不到执行模式：{payload.adapter_mode}"}
+                    ],
+                }
+            parsed = parse_instruction(payload.text)
+            if parsed.errors or parsed.plan is None:
+                return {
+                    "plan": None,
+                    "preview": {},
+                    "errors": [error.model_dump(mode="json") for error in parsed.errors],
+                }
 
-        validated = validate_plan(parsed.plan, selected_adapter)
-        return {
-            "plan": validated.plan.model_dump(mode="json") if validated.plan else None,
-            "preview": validated.preview,
-            "errors": [error.model_dump(mode="json") for error in validated.errors],
-        }
+            validated = validate_plan(parsed.plan, selected_adapter)
+            return {
+                "plan": validated.plan.model_dump(mode="json") if validated.plan else None,
+                "preview": validated.preview,
+                "errors": [error.model_dump(mode="json") for error in validated.errors],
+            }
 
     @app.post("/api/demo/tasks")
     def create_task(payload: CreateTaskRequest) -> dict[str, Any]:
