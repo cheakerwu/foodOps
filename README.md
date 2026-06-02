@@ -69,6 +69,28 @@ http://127.0.0.1:8765
 5. 打开`任务中心`，选择并检查最近任务。
 6. 确认页面中可以看到对应的审计记录。
 
+## Phase 3 MockWebAdapter 演示流程
+
+1. 安装 Playwright 依赖：
+
+   ```powershell
+   & 'E:\anaconda\envs\jobhellper\python.exe' -m pip install -e ".[dev]"
+   & 'E:\anaconda\envs\jobhellper\python.exe' -m playwright install chromium
+   ```
+
+2. 启动本地工作台：
+
+   ```powershell
+   & 'E:\anaconda\envs\jobhellper\python.exe' -m uvicorn food_ops_demo.asgi:app --host 127.0.0.1 --port 8765
+   ```
+
+3. 打开 `http://127.0.0.1:8765/`。
+4. 在执行模式中选择 `MockWebAdapter`。
+5. 点击 `打开 Mock 后台`，确认本地 mock 商家后台能打开。
+6. 运行指令：`把人民广场店的招牌牛肉饭改成 29.9`。
+7. 确认任务执行成功，任务中心出现 `mock_web` 任务。
+8. 打开 `data/demo/mock-web-screenshots/`，确认存在最新执行截图。
+
 ## 示例指令
 
 ```text

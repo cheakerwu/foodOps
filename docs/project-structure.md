@@ -12,7 +12,7 @@
 自然语言指令 -> 标准操作计划 -> 风险校验 -> 人工确认 -> FakeAdapter 执行 -> 回读校验 -> 审计留痕
 ```
 
-当前版本仍然只连接本地 FakeAdapter，不接真实外卖平台、真实 LLM、Playwright RPA 或多用户权限体系。
+当前版本支持 FakeAdapter 和 MockWebAdapter 两种执行模式，其中 MockWebAdapter 通过 Playwright 驱动本地 mock 商家后台页面，验证未来真实 RPA 适配器的执行边界。不接真实外卖平台、真实 LLM 或多用户权限体系。
 
 ## 目录结构
 
@@ -27,15 +27,20 @@ D:\code\demov1
 │   ├── adapter.py          # BasePlatformAdapter and FakePlatformAdapter
 │   ├── audit.py            # JSONL audit log reader/writer
 │   ├── models.py           # Pydantic request, plan, task, snapshot models
+│   ├── mock_web_adapter.py # MockWebAdapter with Playwright fault injection
 │   ├── parser.py           # Rule-based Chinese instruction parser
 │   ├── risk.py             # Risk validation and preview generation
 │   ├── storage.py          # SQLite demo data and task persistence
 │   ├── workflow.py         # Task state machine, execution, verification
-│   └── static/index.html   # Vanilla HTML/CSS/JS workbench
+│   └── static/
+│       ├── index.html      # Vanilla HTML/CSS/JS workbench
+│       └── mock_merchant.html  # Simulated merchant backend for Playwright
 ├── tests/
 │   ├── test_adapter.py
 │   ├── test_adapter_contract.py
 │   ├── test_api.py
+│   ├── test_mock_merchant_page.py
+│   ├── test_mock_web_adapter.py
 │   ├── test_parser.py
 │   ├── test_risk.py
 │   ├── test_static_page.py
@@ -56,6 +61,8 @@ D:\code\demov1
 - `food_ops_demo.parser`：把中文运营指令解析为标准 `OperationPlan`。
 - `food_ops_demo.risk`：生成风险等级、审批要求和变更预览。
 - `food_ops_demo.static.index.html`：本地工作台页面，包含指令输入、人工确认、任务中心、快照和审计结果。
+- `food_ops_demo.mock_web_adapter.MockWebAdapter`：通过 Playwright 驱动本地 mock 商家后台页面，验证未来真实 RPA 适配器的执行边界。
+- `food_ops_demo.static.mock_merchant.html`：本地仿真商家后台，用于 Playwright 点击、截图和异常注入。
 
 ## 已支持指令
 
