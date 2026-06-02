@@ -54,3 +54,28 @@ def test_task_manager_rejects_unknown_adapter_mode(tmp_path):
 
     assert completed.state == "failed"
     assert completed.error.code == "adapter_mode_not_found"
+
+
+class AuthRequiredAdapter(RecordingAdapter):
+    def update_menu_price(self, store_name: str, item_name: str, price: str) -> OperationResult:
+        return OperationResult(
+            success=False,
+            error=ErrorDetail(code="auth_required", message="Mock 后台登录已过期，需要人工处理。"),
+        )
+
+
+def test_task_manager_maps_auth_required_to_manual_required(tmp_path):
+    adapter = AuthRequiredAdapter()
+    plan, preview = _validated_price_plan(adapter)
+    manager = TaskManager(
+        adapters={"mock_web": adapter},
+        default_adapter_mode="mock_web",
+        audit_log=AuditLog(tmp_path / "audit.jsonl"),
+    )
+
+    task = manager.create_task(plan, preview, adapter_mode="mock_web")
+    completed = manager.confirm_task(task.task_id)
+
+    assert completed.state == "manual_required"
+    assert completed.manual_intervention_type == "auth_required"
+    assert completed.error.code == "auth_required"

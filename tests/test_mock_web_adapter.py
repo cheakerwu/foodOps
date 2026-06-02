@@ -68,3 +68,25 @@ def test_mock_web_adapter_saves_screenshot_after_success(mock_page_url, tmp_path
         adapter.close()
 
     assert (tmp_path / "last-success.png").exists()
+
+
+def test_mock_web_adapter_reports_auth_required(mock_page_url):
+    adapter = MockWebAdapter(page_url=f"{mock_page_url}?scenario=auth_required", headless=True)
+    try:
+        result = adapter.update_menu_price("人民广场店", "招牌牛肉饭", "29.90")
+    finally:
+        adapter.close()
+
+    assert result.success is False
+    assert result.error.code == "auth_required"
+
+
+def test_mock_web_adapter_reports_save_failure(mock_page_url):
+    adapter = MockWebAdapter(page_url=f"{mock_page_url}?scenario=save_failure", headless=True)
+    try:
+        result = adapter.update_menu_price("人民广场店", "招牌牛肉饭", "29.90")
+    finally:
+        adapter.close()
+
+    assert result.success is False
+    assert result.error.code == "mock_save_failed"

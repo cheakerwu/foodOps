@@ -118,7 +118,16 @@ class TaskManager:
         result = self._apply_plan(task.plan, adapter)
         if not result.success:
             task.error = result.error
-            self._set_state(task, "failed", result.error.message if result.error else "执行失败。", result.error.code if result.error else None)
+            if result.error and result.error.code == "auth_required":
+                task.manual_intervention_type = "auth_required"
+                self._set_state(task, "manual_required", result.error.message, result.error.code)
+            else:
+                self._set_state(
+                    task,
+                    "failed",
+                    result.error.message if result.error else "执行失败。",
+                    result.error.code if result.error else None,
+                )
             self._append_audit(task)
             self._persist(task)
             return self._copy(task)

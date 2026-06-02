@@ -276,6 +276,15 @@
       window.__mockMerchant.setScenario = setScenario;
       window.__mockMerchant.reset = resetScenario;
 
+      // Auto-apply ?scenario= from URL on page load
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var scenario = params.get("scenario");
+        if (scenario) {
+          setScenario(scenario);
+        }
+      })();
+
       // Wire up global handlers for inline onclick
       window.applyScenario = applyScenario;
       window.resetScenario = resetScenario;
