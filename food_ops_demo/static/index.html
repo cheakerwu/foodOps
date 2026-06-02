@@ -328,6 +328,12 @@
       <section>
         <div class="panel">
           <h2 class="panel-title">指令</h2>
+          <label for="adapterMode">执行模式</label>
+          <select id="adapterMode">
+            <option value="fake">FakeAdapter</option>
+            <option value="mock_web">MockWebAdapter</option>
+          </select>
+          <a href="/mock/merchant" target="_blank" rel="noreferrer">打开 Mock 后台</a>
           <label for="instructionInput">操作指令</label>
           <textarea id="instructionInput">把人民广场店的招牌牛肉饭改成 29.9</textarea>
           <div class="examples">
@@ -404,6 +410,7 @@
 
     const els = {
       instruction: document.getElementById('instructionInput'),
+      adapterMode: document.getElementById('adapterMode'),
       parse: document.getElementById('parseButton'),
       confirm: document.getElementById('confirmButton'),
       simulateLogin: document.getElementById('simulateLoginButton'),
@@ -442,7 +449,7 @@
       els.cancel.disabled = !state.taskId || state.taskState === 'succeeded' || state.taskState === 'cancelled';
     }
 
-    function renderPreview(plan, preview) {
+    function renderPreview(plan, preview, adapterMode) {
       if (!plan) {
         els.preview.innerHTML = '';
         return;
@@ -454,6 +461,7 @@
         ['风险', plan.risk_level],
         ['需要确认', plan.requires_approval ? '是' : '否'],
         ['目标值', formatChanges(plan.changes)],
+        ['执行模式', adapterMode || 'fake'],
       ];
       els.preview.innerHTML = rows.map(([label, value]) => `
         <div class="metric">
@@ -493,7 +501,7 @@
             <span>${escapeHtml(task.updated_at || task.created_at || '')}</span>
           </div>
           <div class="task-target">${escapeHtml(task.instruction || task.plan?.operation_type || task.task_id)}</div>
-          <div class="task-id">${escapeHtml(task.task_id)}</div>
+          <div class="task-id">${escapeHtml(task.task_id)} | ${escapeHtml(task.adapter_mode || 'fake')}</div>
         </article>
       `).join('');
     }
@@ -520,7 +528,7 @@
     function renderTask(task) {
       state.taskId = task.task_id;
       state.taskState = task.state;
-      renderPreview(task.plan, task.preview);
+      renderPreview(task.plan, task.preview, task.adapter_mode);
       renderTimeline(task);
       updateButtons();
     }
@@ -550,9 +558,10 @@
     async function parseAndCreateTask() {
       try {
         setStatus('');
+        const adapterMode = els.adapterMode.value;
         const parsed = await request('/api/demo/parse', {
           method: 'POST',
-          body: JSON.stringify({ text: els.instruction.value }),
+          body: JSON.stringify({ text: els.instruction.value, adapter_mode: adapterMode }),
         });
         if (parsed.errors.length) {
           renderPreview(null, {});
@@ -562,7 +571,7 @@
         }
         const task = await request('/api/demo/tasks', {
           method: 'POST',
-          body: JSON.stringify({ plan: parsed.plan, preview: parsed.preview }),
+          body: JSON.stringify({ plan: parsed.plan, preview: parsed.preview, adapter_mode: adapterMode }),
         });
         renderTask(task);
         await loadTasks();
