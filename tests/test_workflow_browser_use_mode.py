@@ -15,7 +15,7 @@ import pytest
 from food_ops_demo.adapter import FakePlatformAdapter
 from food_ops_demo.adapter_registry import AdapterRegistry
 from food_ops_demo.audit import AuditLog
-from food_ops_demo.browser_use_adapter import BrowserUseAdapter, _PriceUpdateResult
+from food_ops_demo.browser_use_adapter import BrowserUseAdapter, _PriceUpdateResult, _StoreSnapshotResult
 from food_ops_demo.models import StoreSnapshot, MenuItem
 from food_ops_demo.parser import parse_instruction
 from food_ops_demo.risk import validate_plan
@@ -433,10 +433,39 @@ class TestAPIBrowserUseMode:
         from fastapi.testclient import TestClient
         from food_ops_demo.app import create_app
 
+        snapshot_result = _StoreSnapshotResult(
+            store_id="store_real_001",
+            store_name="人民广场店",
+            phone="021-88888888",
+            business_hours=[{"start": "09:30", "end": "21:30"}],
+            items=[
+                {
+                    "item_id": "remote_item_001",
+                    "name": "招牌牛肉饭",
+                    "price": "32.00",
+                    "sale_status": "on_sale",
+                    "image": "",
+                }
+            ],
+        )
         snapshot_history = _make_history(
+            structured_output=snapshot_result,
             final_result="Store data extracted",
         )
-        mock_agent_cls.return_value.run_sync.return_value = snapshot_history
+        price_update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True,
+                observed_price="29.90",
+                evidence_text="Price updated successfully.",
+            ),
+        )
+        # get_snapshot and find_menu_items (which calls get_snapshot) use snapshot_history;
+        # update_menu_price uses price_update_history.
+        mock_agent_cls.return_value.run_sync.side_effect = [
+            snapshot_history,   # get_snapshot (via validate_plan)
+            snapshot_history,   # find_menu_items -> get_snapshot (via _single_item)
+            price_update_history,  # update_menu_price
+        ]
 
         client = TestClient(
             create_app(

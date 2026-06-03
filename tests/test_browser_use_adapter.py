@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from food_ops_demo.browser_use_adapter import BrowserUseAdapter, _PriceUpdateResult
+from food_ops_demo.browser_use_adapter import BrowserUseAdapter, _PriceUpdateResult, _StoreSnapshotResult
 from food_ops_demo.models import OperationResult
 
 
@@ -374,3 +374,46 @@ def test_validate_configuration_requires_api_key_when_enabled(monkeypatch, tmp_p
     assert result.success is False
     assert result.error.code == "browser_use_configuration_error"
     assert "BROWSER_USE_API_KEY" in result.error.message
+
+
+# ---------------------------------------------------------------------------
+# get_snapshot -- structured output
+# ---------------------------------------------------------------------------
+
+
+@patch("browser_use.Agent")
+def test_get_snapshot_maps_structured_browser_use_output(mock_agent_cls, adapter):
+    history = _make_history()
+    history.structured_output = _StoreSnapshotResult(
+        store_id="store_real_001",
+        store_name="人民广场店",
+        phone="021-88888888",
+        business_hours=[{"start": "09:30", "end": "21:30"}],
+        items=[
+            {
+                "item_id": "remote_item_001",
+                "name": "招牌牛肉饭",
+                "price": "32.00",
+                "sale_status": "on_sale",
+                "image": "",
+            }
+        ],
+    )
+    mock_agent_cls.return_value.run_sync.return_value = history
+
+    snapshot = adapter.get_snapshot("人民广场店")
+
+    assert snapshot.store_id == "store_real_001"
+    assert snapshot.store_name == "人民广场店"
+    assert snapshot.items[0].name == "招牌牛肉饭"
+    assert snapshot.items[0].price == "32.00"
+
+
+@patch("browser_use.Agent")
+def test_get_snapshot_raises_when_structured_output_missing(mock_agent_cls, adapter):
+    history = _make_history(final_result="plain text only")
+    history.structured_output = None
+    mock_agent_cls.return_value.run_sync.return_value = history
+
+    with pytest.raises(RuntimeError, match="structured snapshot"):
+        adapter.get_snapshot("人民广场店")

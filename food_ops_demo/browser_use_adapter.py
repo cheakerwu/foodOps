@@ -27,6 +27,22 @@ class _PriceUpdateResult(BaseModel):
     evidence_text: str = ""
 
 
+class _StoreSnapshotItemResult(BaseModel):
+    item_id: str = ""
+    name: str
+    price: str
+    sale_status: str = "on_sale"
+    image: str = ""
+
+
+class _StoreSnapshotResult(BaseModel):
+    store_id: str = ""
+    store_name: str
+    phone: str = ""
+    business_hours: list[dict[str, str]] = []
+    items: list[_StoreSnapshotItemResult] = []
+
+
 class BrowserUseAdapter(BasePlatformAdapter):
     """Adapter that drives a real browser via the browser-use AI agent.
 
@@ -146,33 +162,44 @@ class BrowserUseAdapter(BasePlatformAdapter):
     def get_snapshot(self, store_name: str) -> StoreSnapshot:
         """Launch an agent task to read the current page and extract store data.
 
-        For v1 this is expensive but correct.
+        Uses structured output via ``_StoreSnapshotResult`` so the agent returns
+        parseable JSON rather than free-form text.
         """
         task = (
-            f"Navigate to the store management page and extract the current store data "
-            f"for store named '{store_name}'. Return the store name, phone, business hours, "
-            f"and all menu items with their name, price, and sale status."
+            f"Navigate to {self.page_url}. Extract the current store data for store named '{store_name}'. "
+            "Return structured data with store_id, store_name, phone, business_hours, and items. "
+            "Each item must include item_id, name, price, sale_status, and image."
         )
         try:
-            history = self._run_agent(task)
+            history = self._run_agent(task, output_model_schema=_StoreSnapshotResult)
             self._collect_screenshots(history)
         except Exception as exc:
             raise RuntimeError(
                 f"BrowserUseAgent failed while getting snapshot for '{store_name}': {exc}"
             ) from exc
 
-        final_result = history.final_result()
-        if final_result is None:
-            raise RuntimeError(
-                f"BrowserUseAgent returned no result for snapshot of '{store_name}'."
-            )
+        structured = history.structured_output
+        if structured is None:
+            raise RuntimeError(f"BrowserUseAgent returned no structured snapshot for '{store_name}'.")
+        if structured.store_name != store_name:
+            raise KeyError(store_name)
 
         return StoreSnapshot(
-            store_id="",
-            store_name=store_name,
-            phone="",
-            business_hours=[],
-            items=[],
+            store_id=structured.store_id,
+            store_name=structured.store_name,
+            phone=structured.phone,
+            business_hours=structured.business_hours,
+            items=[
+                MenuItem(
+                    item_id=item.item_id or item.name,
+                    store_id=structured.store_id,
+                    name=item.name,
+                    price=item.price,
+                    sale_status=item.sale_status,
+                    image=item.image,
+                )
+                for item in structured.items
+            ],
         )
 
     def find_menu_items(self, store_name: str, item_name: str) -> list[MenuItem]:
