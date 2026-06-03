@@ -1,3 +1,5 @@
+import dataclasses
+
 from fastapi.testclient import TestClient
 
 from food_ops_demo.app import create_app
@@ -6,12 +8,10 @@ from food_ops_demo.config import FoodOpsSettings
 
 def _client(tmp_path):
     settings = FoodOpsSettings.from_env()
-    settings = FoodOpsSettings(
-        **{
-            **settings.__dict__,
-            "database_path": tmp_path / "food_ops.sqlite3",
-            "audit_path": tmp_path / "audit.jsonl",
-        }
+    settings = dataclasses.replace(
+        settings,
+        database_path=tmp_path / "food_ops.sqlite3",
+        audit_path=tmp_path / "audit.jsonl",
     )
     return TestClient(create_app(settings=settings))
 

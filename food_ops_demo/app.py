@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 from typing import Any
 
@@ -99,5 +100,5 @@ def _settings_from_kwargs(
         overrides["browser_use_max_steps"] = browser_use_max_steps
 
     if overrides:
-        return FoodOpsSettings(**{**base.__dict__, **overrides})
+        return dataclasses.replace(base, **overrides)
     return base

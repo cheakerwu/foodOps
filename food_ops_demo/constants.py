@@ -47,3 +47,6 @@ class ErrorCode:
     BROWSER_USE_VERIFICATION_FAILED = "browser_use_verification_failed"
     BROWSER_USE_UNSUPPORTED_OPERATION = "browser_use_unsupported_operation"
     BROWSER_USE_CONFIGURATION_ERROR = "browser_use_configuration_error"
+
+
+DEFAULT_STORE_NAME = "人民广场店"

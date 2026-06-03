@@ -5,12 +5,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from food_ops_demo.constants import DEFAULT_STORE_NAME
 from food_ops_demo.dependencies import AppServices
 from food_ops_demo.models import OperationPlan
 from food_ops_demo.parser import parse_instruction
 from food_ops_demo.risk import validate_plan
-
-DEFAULT_STORE_NAME = "人民广场店"
 
 
 class ParseRequest(BaseModel):

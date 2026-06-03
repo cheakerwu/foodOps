@@ -7,9 +7,8 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from food_ops_demo.constants import DEFAULT_STORE_NAME
 from food_ops_demo.dependencies import AppServices
-
-DEFAULT_STORE_NAME = "人民广场店"
 
 
 def _inject_mock_state(html: str, state: dict[str, Any]) -> str:
