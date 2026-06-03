@@ -54,6 +54,15 @@ class StoreSnapshot(BaseModel):
     items: list[MenuItem]
 
 
+class AdapterCapabilities(BaseModel):
+    adapter_mode: str
+    real_platform: bool = False
+    supported_operations: list[str] = Field(default_factory=list)
+    requires_browser_session: bool = False
+    requires_api_key: bool = False
+    supports_shadow_mode: bool = False
+
+
 class BrowserUseExecutionEvidence(BaseModel):
     success: bool
     operation_type: str

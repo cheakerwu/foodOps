@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
+import os
 from pathlib import Path
 from typing import Any
 
@@ -7,6 +10,7 @@ from pydantic import BaseModel
 
 from food_ops_demo.adapter import BasePlatformAdapter
 from food_ops_demo.models import (
+    AdapterCapabilities,
     BrowserUseExecutionEvidence,
     ErrorDetail,
     MenuItem,
@@ -37,6 +41,7 @@ class BrowserUseAdapter(BasePlatformAdapter):
         llm: Any | None = None,
         screenshot_dir: str | Path | None = None,
         max_steps: int = 25,
+        require_api_key: bool = False,
     ) -> None:
         self.page_url = page_url
         self._browser = browser
@@ -45,17 +50,46 @@ class BrowserUseAdapter(BasePlatformAdapter):
         self._screenshot_dir = Path(screenshot_dir) if screenshot_dir else None
         self._max_steps = max_steps
         self._screenshot_paths: list[str] = []
+        self._require_api_key = require_api_key
 
     # -- resource management --------------------------------------------------
 
     def close(self) -> None:
         """Close browser resources if owned by this adapter."""
-        if self._owns_browser and self._browser is not None:
+        if not self._owns_browser or self._browser is None:
+            return
+        close = getattr(self._browser, "close", None)
+        if callable(close):
             try:
-                self._browser.close()
+                result = close()
+                if inspect.isawaitable(result):
+                    asyncio.run(result)
             except Exception:  # pragma: no cover -- best-effort cleanup
                 pass
-            self._browser = None
+        self._browser = None
+
+    # -- capabilities and configuration ----------------------------------------
+
+    def capabilities(self) -> AdapterCapabilities:
+        return AdapterCapabilities(
+            adapter_mode="browser_use",
+            real_platform=True,
+            supported_operations=["menu.update_price"],
+            requires_browser_session=True,
+            requires_api_key=self._require_api_key,
+            supports_shadow_mode=False,
+        )
+
+    def _configuration_error(self) -> OperationResult | None:
+        if self._require_api_key and not os.getenv("BROWSER_USE_API_KEY"):
+            return OperationResult(
+                success=False,
+                error=ErrorDetail(
+                    code="browser_use_configuration_error",
+                    message="BROWSER_USE_API_KEY is required for browser_use mode.",
+                ),
+            )
+        return None
 
     # -- helpers --------------------------------------------------------------
 
@@ -155,6 +189,10 @@ class BrowserUseAdapter(BasePlatformAdapter):
         Builds a narrow task prompt, runs the agent with structured output,
         and maps the result to an ``OperationResult``.
         """
+        config_error = self._configuration_error()
+        if config_error is not None:
+            return config_error
+
         task = (
             f"On the merchant management page for store '{store_name}', "
             f"find the menu item named '{item_name}' and change its price to {price}. "

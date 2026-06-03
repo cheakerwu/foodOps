@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+import inspect
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -325,3 +326,51 @@ class TestAdapterInterface:
         for r in (r1, r2, r3):
             assert isinstance(r, OperationResult)
             assert r.success is False
+
+
+# ---------------------------------------------------------------------------
+# capabilities and configuration validation
+# ---------------------------------------------------------------------------
+
+
+def test_browser_use_adapter_declares_real_platform_capabilities(adapter):
+    capabilities = adapter.capabilities()
+
+    assert capabilities.adapter_mode == "browser_use"
+    assert capabilities.real_platform is True
+    assert capabilities.supported_operations == ["menu.update_price"]
+    assert capabilities.requires_browser_session is True
+    assert capabilities.requires_api_key is False
+
+
+def test_close_runs_async_browser_close_when_needed(tmp_path):
+    browser = MagicMock()
+    browser.close = AsyncMock()
+    adapter = BrowserUseAdapter(
+        page_url="https://merchant.example.com",
+        browser=browser,
+        llm=MagicMock(),
+    )
+    adapter._owns_browser = True
+
+    adapter.close()
+
+    browser.close.assert_awaited_once()
+    assert adapter._browser is None
+    assert inspect.iscoroutinefunction(browser.close)
+
+
+def test_validate_configuration_requires_api_key_when_enabled(monkeypatch, tmp_path):
+    monkeypatch.delenv("BROWSER_USE_API_KEY", raising=False)
+    adapter = BrowserUseAdapter(
+        page_url="https://merchant.example.com",
+        browser=MagicMock(),
+        llm=MagicMock(),
+        require_api_key=True,
+    )
+
+    result = adapter.update_menu_price("人民广场店", "招牌牛肉饭", "29.90")
+
+    assert result.success is False
+    assert result.error.code == "browser_use_configuration_error"
+    assert "BROWSER_USE_API_KEY" in result.error.message
