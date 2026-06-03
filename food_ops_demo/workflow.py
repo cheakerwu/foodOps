@@ -163,6 +163,8 @@ class TaskManager:
             "verified": verified,
             "submitted": result.submitted,
             "shadow_mode": result.shadow_mode,
+            "evidence": result.evidence,
+            "screenshot_paths": result.screenshot_paths,
         }
         if verified:
             self._set_state(task, "succeeded", "任务执行成功，回读校验通过。")

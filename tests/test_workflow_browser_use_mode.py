@@ -7,6 +7,7 @@ is managed by the AdapterRegistry.
 
 from __future__ import annotations
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -480,3 +481,400 @@ class TestAPIBrowserUseMode:
         body = response.json()
         assert body["plan"] is None
         assert body["errors"][0]["code"] == "adapter_mode_not_found"
+
+
+# ---------------------------------------------------------------------------
+# Audit content verification for browser_use mode
+# ---------------------------------------------------------------------------
+
+
+class TestBrowserUseAuditContent:
+    """Verify that audit records contain browser_use specific fields."""
+
+    def _read_audit_records(self, audit_path) -> list[dict]:
+        """Read all audit records from the JSONL file."""
+        if not audit_path.exists():
+            return []
+        lines = [
+            line
+            for line in audit_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        return [json.loads(line) for line in lines]
+
+    @patch("browser_use.Agent")
+    def test_audit_contains_adapter_mode(self, mock_agent_cls, tmp_path):
+        """Audit record should include adapter_mode field."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True, observed_price="29.90"
+            ),
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        assert final_record["adapter_mode"] == "browser_use"
+
+    @patch("browser_use.Agent")
+    def test_audit_contains_before_snapshot(self, mock_agent_cls, tmp_path):
+        """Audit record should include before_snapshot from the adapter."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True, observed_price="29.90"
+            ),
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        assert final_record["before_snapshot"]  # non-empty dict
+        assert "items" in final_record["before_snapshot"]
+
+    @patch("browser_use.Agent")
+    def test_audit_contains_after_snapshot(self, mock_agent_cls, tmp_path):
+        """Audit record should include after_snapshot from verification."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True, observed_price="29.90"
+            ),
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        assert final_record["after_snapshot"]  # non-empty dict
+        assert "items" in final_record["after_snapshot"]
+
+    @patch("browser_use.Agent")
+    def test_audit_contains_evidence(self, mock_agent_cls, tmp_path):
+        """Audit record should include evidence from OperationResult."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True,
+                observed_price="29.90",
+                evidence_text="Price updated successfully.",
+            ),
+            screenshot_paths=["/tmp/shot1.png"],
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        evidence = final_record["result"]["evidence"]
+        assert evidence  # non-empty dict
+        assert evidence["success"] is True
+        assert evidence["store_name"] == "人民广场店"
+        assert evidence["target_name"] == "招牌牛肉饭"
+        assert evidence["screenshot_paths"] == ["/tmp/shot1.png"]
+
+    @patch("browser_use.Agent")
+    def test_audit_contains_screenshot_paths(self, mock_agent_cls, tmp_path):
+        """Audit record should include screenshot_paths from OperationResult."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True, observed_price="29.90"
+            ),
+            screenshot_paths=["/tmp/shot1.png", "/tmp/shot2.png"],
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        assert final_record["result"]["screenshot_paths"] == [
+            "/tmp/shot1.png",
+            "/tmp/shot2.png",
+        ]
+
+    @patch("browser_use.Agent")
+    def test_audit_timeline_includes_executing_state(self, mock_agent_cls, tmp_path):
+        """Timeline should include executing state with browser_use message."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True, observed_price="29.90"
+            ),
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        timeline = final_record["timeline"]
+        executing_events = [
+            e for e in timeline if e["state"] == "executing"
+        ]
+        assert len(executing_events) >= 1
+        assert "browser_use" in executing_events[0]["message"]
+
+    @patch("browser_use.Agent")
+    def test_audit_timeline_includes_verifying_state(self, mock_agent_cls, tmp_path):
+        """Timeline should include verifying state with verification message."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True, observed_price="29.90"
+            ),
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        timeline = final_record["timeline"]
+        verifying_events = [
+            e for e in timeline if e["state"] == "verifying"
+        ]
+        assert len(verifying_events) >= 1
+        assert "正在回读校验执行结果" in verifying_events[0]["message"]
+
+    @patch("browser_use.Agent")
+    def test_audit_timeline_includes_succeeded_state(self, mock_agent_cls, tmp_path):
+        """Timeline should include succeeded state for successful tasks."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True, observed_price="29.90"
+            ),
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        timeline = final_record["timeline"]
+        succeeded_events = [
+            e for e in timeline if e["state"] == "succeeded"
+        ]
+        assert len(succeeded_events) == 1
+        assert "成功" in succeeded_events[0]["message"]
+
+    @patch("browser_use.Agent")
+    def test_audit_timeline_includes_failed_state(self, mock_agent_cls, tmp_path):
+        """Timeline should include failed state for failed tasks."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=False,
+                observed_price="32.00",
+                evidence_text="Price field did not update.",
+            ),
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(return_value=_fake_snapshot())
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        timeline = final_record["timeline"]
+        failed_events = [
+            e for e in timeline if e["state"] == "failed"
+        ]
+        assert len(failed_events) >= 1
+
+    @patch("browser_use.Agent")
+    def test_full_audit_timeline_sequence(self, mock_agent_cls, tmp_path):
+        """Verify the complete timeline sequence for a successful browser_use task."""
+        mock_browser = MagicMock()
+        update_history = _make_history(
+            structured_output=_PriceUpdateResult(
+                success=True,
+                observed_price="29.90",
+                evidence_text="Price updated.",
+            ),
+            screenshot_paths=["/tmp/shot1.png"],
+        )
+        mock_agent_cls.return_value.run_sync.return_value = update_history
+
+        adapter = _make_browser_use_adapter(mock_browser, tmp_path)
+        adapter.get_snapshot = MagicMock(
+            side_effect=[_fake_snapshot("32.00"), _fake_snapshot("29.90")]
+        )
+
+        audit_path = tmp_path / "audit.jsonl"
+        plan, preview = _validated_price_plan()
+        manager = TaskManager(
+            adapters={"browser_use": adapter},
+            default_adapter_mode="browser_use",
+            audit_log=AuditLog(audit_path),
+        )
+
+        task = manager.create_task(plan, preview, adapter_mode="browser_use")
+        manager.confirm_task(task.task_id)
+
+        records = self._read_audit_records(audit_path)
+        assert len(records) >= 1
+        final_record = records[-1]
+        timeline = final_record["timeline"]
+        states = [e["state"] for e in timeline]
+
+        # Verify expected state sequence
+        assert "created" in states
+        assert "parsed" in states
+        assert "validated" in states
+        assert "previewed" in states
+        assert "awaiting_approval" in states
+        assert "queued" in states
+        assert "executing" in states
+        assert "verifying" in states
+        assert "succeeded" in states
+
+        # Verify executing comes before verifying
+        executing_idx = states.index("executing")
+        verifying_idx = states.index("verifying")
+        assert executing_idx < verifying_idx
+
+        # Verify verifying comes before succeeded
+        succeeded_idx = states.index("succeeded")
+        assert verifying_idx < succeeded_idx
