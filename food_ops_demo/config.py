@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def _get_bool(name: str, default: str) -> bool:
-    return os.getenv(name, default) not in {"0", "false", "False", "no", "NO"}
+    return os.getenv(name, default).lower() not in {"0", "false", "no"}
 
 
 def _get_int(name: str, default: str) -> int:
@@ -33,7 +33,7 @@ class FoodOpsSettings:
     browser_use_url: str
     browser_use_screenshot_dir: Path
     browser_use_max_steps: int
-    browser_use_required_api_key: bool
+    browser_use_require_api_key: bool
     log_level: str
 
     @classmethod
@@ -65,6 +65,6 @@ class FoodOpsSettings:
                 os.getenv("FOOD_OPS_BROWSER_USE_SCREENSHOT_DIR", str(data_dir / "browser-use-screenshots"))
             ),
             browser_use_max_steps=_get_int("FOOD_OPS_BROWSER_USE_MAX_STEPS", "25"),
-            browser_use_required_api_key=_get_bool("FOOD_OPS_BROWSER_USE_REQUIRE_API_KEY", "0"),
+            browser_use_require_api_key=_get_bool("FOOD_OPS_BROWSER_USE_REQUIRE_API_KEY", "0"),
             log_level=os.getenv("FOOD_OPS_LOG_LEVEL", "INFO"),
         )

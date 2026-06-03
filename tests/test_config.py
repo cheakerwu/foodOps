@@ -4,16 +4,28 @@ import pytest
 
 from food_ops_demo.config import FoodOpsSettings
 
+_ALL_FOOD_OPS_KEYS = [
+    "FOOD_OPS_ENV",
+    "FOOD_OPS_API_PREFIX",
+    "FOOD_OPS_DATA_DIR",
+    "FOOD_OPS_DATABASE_PATH",
+    "FOOD_OPS_AUDIT_PATH",
+    "FOOD_OPS_LOG_LEVEL",
+    "FOOD_OPS_MOCK_WEB_URL",
+    "FOOD_OPS_MOCK_WEB_SCREENSHOT_DIR",
+    "FOOD_OPS_MOCK_WEB_HEADLESS",
+    "FOOD_OPS_SHADOW_URL",
+    "FOOD_OPS_SHADOW_SCREENSHOT_DIR",
+    "FOOD_OPS_SHADOW_HEADLESS",
+    "FOOD_OPS_BROWSER_USE_URL",
+    "FOOD_OPS_BROWSER_USE_SCREENSHOT_DIR",
+    "FOOD_OPS_BROWSER_USE_MAX_STEPS",
+    "FOOD_OPS_BROWSER_USE_REQUIRE_API_KEY",
+]
+
 
 def test_settings_defaults_are_v1_ready(monkeypatch):
-    for key in [
-        "FOOD_OPS_ENV",
-        "FOOD_OPS_API_PREFIX",
-        "FOOD_OPS_DATA_DIR",
-        "FOOD_OPS_DATABASE_PATH",
-        "FOOD_OPS_AUDIT_PATH",
-        "FOOD_OPS_BROWSER_USE_MAX_STEPS",
-    ]:
+    for key in _ALL_FOOD_OPS_KEYS:
         monkeypatch.delenv(key, raising=False)
 
     settings = FoodOpsSettings.from_env()
