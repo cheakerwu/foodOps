@@ -19,6 +19,9 @@ dev = [
   "pytest>=8.0,<9.0",
   "playwright>=1.49,<2.0",
 ]
+browser_use = [
+  "browser-use>=0.1.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["food_ops_demo*"]
@@ -28,4 +31,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+markers = [
+  "browser_use: tests that require the browser-use package (install with extra [browser_use])",
 ]
