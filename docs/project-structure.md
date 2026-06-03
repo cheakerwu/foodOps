@@ -1,18 +1,24 @@
 # 项目内容整理
 
-更新时间：2026-06-02
-当前分支：`main`
-合并提交：`14a9396 merge: phase 2 local ops workbench`
+更新时间：2026-06-03
+当前定位：正式版 V1 验证构建
+当前验收基线：`183 passed, 1 xpassed`，且 V1 完成后不应存在 browser-use close RuntimeWarning。
 
 ## 当前定位
 
-本项目是外卖运营 Agent 的本地 MVP 工作台，用 FastAPI + SQLite + 静态 HTML 页面验证一个可回放的运营闭环：
+本项目是外卖运营 Agent 的正式版 V1 验证构建，用 FastAPI + SQLite + 静态 HTML 页面验证一个可回放的运营闭环：
 
 ```text
-自然语言指令 -> 标准操作计划 -> 风险校验 -> 人工确认 -> FakeAdapter 执行 -> 回读校验 -> 审计留痕
+自然语言指令 -> 标准操作计划 -> 风险校验 -> 人工确认 -> 任务入队/执行 -> 回读校验 -> 证据与审计留痕
 ```
 
-当前版本支持 FakeAdapter、MockWebAdapter、ShadowMode 和 BrowserUseAdapter 四种执行模式。ShadowMode 只读取、定位、预填和截图，不点击保存或提交。BrowserUseAdapter 通过 browser-use AI 代理驱动真实浏览器，为实验性功能。不接真实外卖平台、真实 LLM 或多用户权限体系。
+当前版本支持 FakeAdapter、MockWebAdapter、ShadowMode 和 BrowserUseAdapter 四种执行模式。ShadowMode 只读取、定位、预填和截图，不点击保存或提交。BrowserUseAdapter 通过 browser-use AI 代理驱动真实浏览器，当前正式支持菜品改价操作。
+
+## 控制面与执行面
+
+- 控制面：FastAPI 负责解析、校验、审批、入队、任务状态和审计查询。
+- 执行面：LocalRunner 负责获取 queued job、创建 scoped adapter、执行浏览器操作、回写任务状态和审计证据。
+- 真实平台 adapter 不应作为 FastAPI 全局单例长期持有浏览器会话。
 
 ## 目录结构
 
@@ -133,7 +139,7 @@ http://127.0.0.1:8765/
 当前 `main` 合并后验证结果：
 
 ```text
-72 passed
+183 passed, 1 xpassed
 ```
 
 ## 本地运行产物

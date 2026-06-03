@@ -1,2 +1,2 @@
-"""Food delivery operations Agent local MVP."""
+"""Food delivery operations Agent V1 validation package."""
 

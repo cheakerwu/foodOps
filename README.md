@@ -1,12 +1,34 @@
 # 外卖运营 Agent 工作台
 
-本仓库当前实现一个最小本地 MVP，用于验证外卖/本地生活运营 Agent 的核心闭环：
+本仓库当前定位为正式版 V1 验证构建，用于在真实外卖平台接入前验证运营 Agent 的控制面、执行面、审计证据和浏览器自动化适配边界。
+
+核心闭环：
 
 ```text
-自然语言指令 -> 标准操作计划 -> 风险校验 -> 人工确认 -> FakeAdapter 执行 -> 回读校验 -> 审计留痕
+自然语言指令 -> 标准操作计划 -> 风险校验 -> 人工确认 -> 任务入队/执行 -> 回读校验 -> 证据与审计留痕
 ```
 
-第一版不接真实外卖平台、不接 Playwright、不接真实 LLM、不引入数据库。
+V1 保留本地 FakeAdapter、MockWebAdapter 和 ShadowMode 作为验收工具，同时引入 BrowserUse 真实平台测试模式，用于对接真实商家后台前的自动化验证。
+
+## API 命名空间
+
+- `/api/v1/*`：正式 V1 控制面接口。
+- `/api/demo/*`：本地兼容接口，保留给既有验收脚本和演示页面。
+- `/mock/merchant`：开发用 Mock 商家后台，不作为真实平台接口。
+
+## BrowserUse 真实平台测试
+
+`browser_use` 模式通过 browser-use Agent 操作目标后台页面。V1 要求每次执行都产生结构化结果、最终 URL、观测值、截图路径和审计记录。
+
+当前正式支持：
+
+- `menu.update_price`
+
+当前返回明确错误的能力：
+
+- `menu.update_sale_status`
+- `store.update_business_hours`
+- `store.update_phone`
 
 ## 当前能力
 
