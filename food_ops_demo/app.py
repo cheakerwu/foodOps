@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field
 from food_ops_demo.adapter import FakePlatformAdapter
 from food_ops_demo.adapter_registry import AdapterRegistry
 from food_ops_demo.audit import AuditLog
+from food_ops_demo.browser_use_adapter import BrowserUseAdapter
 from food_ops_demo.mock_web_adapter import MockWebAdapter
 from food_ops_demo.shadow_adapter import ShadowPlatformAdapter
 from food_ops_demo.models import OperationPlan
@@ -44,6 +46,9 @@ def create_app(
     mock_web_url: str | None = None,
     shadow_url: str | None = None,
     shadow_screenshot_dir: str | Path | None = None,
+    browser_use_url: str | None = None,
+    browser_use_screenshot_dir: str | Path | None = None,
+    browser_use_max_steps: int | None = None,
 ) -> FastAPI:
     database = DemoDatabase(database_path or os.getenv("FOOD_OPS_DATABASE_PATH", "data/demo/demo.sqlite3"))
     fake_adapter = FakePlatformAdapter(database=database)
@@ -54,6 +59,15 @@ def create_app(
         or os.getenv("FOOD_OPS_SHADOW_SCREENSHOT_DIR")
         or "data/demo/shadow-mode-evidence"
     )
+    browser_use_target_url = browser_use_url or os.getenv(
+        "FOOD_OPS_BROWSER_USE_URL", "http://127.0.0.1:8765/mock/merchant"
+    )
+    browser_use_ss_dir = (
+        browser_use_screenshot_dir
+        or os.getenv("FOOD_OPS_BROWSER_USE_SCREENSHOT_DIR")
+        or "data/demo/browser-use-screenshots"
+    )
+    browser_use_steps = browser_use_max_steps or int(os.getenv("FOOD_OPS_BROWSER_USE_MAX_STEPS", "25"))
     adapter_registry = AdapterRegistry(
         {
             "fake": lambda: fake_adapter,
@@ -61,11 +75,17 @@ def create_app(
                 page_url=mock_url,
                 screenshot_dir=os.getenv("FOOD_OPS_MOCK_WEB_SCREENSHOT_DIR", "data/demo/mock-web-screenshots"),
                 headless=os.getenv("FOOD_OPS_MOCK_WEB_HEADLESS", "1") != "0",
+                database=database,
             ),
             "shadow": lambda: ShadowPlatformAdapter(
                 page_url=shadow_target_url,
                 screenshot_dir=shadow_evidence_dir,
                 headless=os.getenv("FOOD_OPS_SHADOW_HEADLESS", "1") != "0",
+            ),
+            "browser_use": lambda: BrowserUseAdapter(
+                page_url=browser_use_target_url,
+                screenshot_dir=browser_use_ss_dir,
+                max_steps=browser_use_steps,
             ),
         },
         shared_modes={"fake"},
@@ -90,7 +110,13 @@ def create_app(
 
     @app.get("/mock/merchant", response_class=HTMLResponse)
     def mock_merchant() -> str:
-        return mock_merchant_page.read_text(encoding="utf-8")
+        html = mock_merchant_page.read_text(encoding="utf-8")
+        state = _mock_state_from_snapshot(fake_adapter.get_snapshot(DEFAULT_STORE_NAME))
+        return _inject_mock_state(html, state)
+
+    @app.get("/api/mock/merchant/snapshot")
+    def mock_merchant_snapshot() -> dict[str, Any]:
+        return _mock_state_from_snapshot(fake_adapter.get_snapshot(DEFAULT_STORE_NAME))
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -172,3 +198,27 @@ def create_app(
 
 def _task_response(task) -> dict[str, Any]:
     return task.model_dump(mode="json")
+
+
+def _inject_mock_state(html: str, state: dict[str, Any]) -> str:
+    state_json = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
+    script = f"<script>window.__MOCK_MERCHANT_INITIAL_STATE__={state_json};</script>"
+    return html.replace("<head>", f"<head>\n  {script}", 1)
+
+
+def _mock_state_from_snapshot(snapshot) -> dict[str, Any]:
+    return {
+        "storeId": snapshot.store_id,
+        "storeName": snapshot.store_name,
+        "phone": snapshot.phone,
+        "businessHours": snapshot.business_hours,
+        "items": {
+            item.item_id: {
+                "name": item.name,
+                "price": float(item.price),
+                "saleStatus": item.sale_status,
+            }
+            for item in snapshot.items
+        },
+        "scenario": None,
+    }
