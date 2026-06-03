@@ -232,6 +232,14 @@ class DemoDatabase:
                 (state, json.dumps(result, ensure_ascii=False), now, job_id),
             )
 
+    def get_job_task_id(self, job_id: str) -> str | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT task_id FROM operation_jobs WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
+        return row["task_id"] if row else None
+
     def _update_menu_field(self, store_name: str, item_name: str, field: str, value: str) -> bool:
         if field not in {"price", "sale_status"}:
             raise ValueError(field)

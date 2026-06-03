@@ -19,6 +19,8 @@ class TaskManager:
         adapters: dict[str, BasePlatformAdapter] | None = None,
         adapter_registry: AdapterRegistry | None = None,
         default_adapter_mode: str = "fake",
+        queue_browser_modes: bool = False,
+        platform_account_id: str = "local_demo",
     ) -> None:
         default_adapter = adapter or FakePlatformAdapter(database=database)
         self.adapter_registry = adapter_registry
@@ -27,6 +29,8 @@ class TaskManager:
         self.adapter = self.adapters[self.default_adapter_mode]
         self.audit_log = audit_log or AuditLog(Path("data/demo/audit.jsonl"))
         self.database = database
+        self.queue_browser_modes = queue_browser_modes
+        self.platform_account_id = platform_account_id
         self._tasks: dict[str, Task] = {}
 
     def create_task(self, plan: OperationPlan, preview: dict[str, Any], adapter_mode: str | None = None) -> Task:
@@ -96,10 +100,29 @@ class TaskManager:
         self._persist(task)
         return self._copy(task)
 
+    def _should_queue(self, task: Task) -> bool:
+        return self.queue_browser_modes and task.adapter_mode in {"mock_web", "shadow", "browser_use"}
+
     def _adapter_for(self, task: Task) -> BasePlatformAdapter | None:
         return self.adapters.get(task.adapter_mode)
 
     def _execute(self, task: Task, skip_queue: bool = False) -> Task:
+        if not skip_queue and self.database is not None and self._should_queue(task):
+            self._set_state(task, "queued", "任务已进入执行队列。")
+            lock_key = f"{self.platform_account_id}:{task.plan.store_name}"
+            job_id = self.database.enqueue_job(
+                batch_id=task.task_id,
+                task_id=task.task_id,
+                adapter_mode=task.adapter_mode,
+                platform_account_id=self.platform_account_id,
+                lock_key=lock_key,
+                plan=task.plan,
+            )
+            task.result = {"queued": True, "job_id": job_id, "lock_key": lock_key}
+            self._append_audit(task)
+            self._persist(task)
+            return self._copy(task)
+
         if self.adapter_registry is None:
             adapter = self._adapter_for(task)
             if adapter is None:
