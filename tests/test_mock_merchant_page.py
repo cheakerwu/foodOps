@@ -27,3 +27,24 @@ def test_mock_merchant_route_serves_page(tmp_path):
     assert response.status_code == 200
     assert "Mock 商家后台" in response.text
     assert 'data-testid="save-phone-button"' in response.text
+
+
+def test_mock_merchant_route_includes_current_database_snapshot(tmp_path):
+    client = TestClient(create_app(database_path=tmp_path / "demo.sqlite3", audit_path=tmp_path / "audit.jsonl"))
+    parsed = client.post(
+        "/api/demo/parse",
+        json={
+            "text": "\u628a\u4eba\u6c11\u5e7f\u573a\u5e97\u7684\u62db\u724c\u725b\u8089\u996d\u6539\u6210 1000",
+            "adapter_mode": "fake",
+        },
+    ).json()
+    task = client.post(
+        "/api/demo/tasks",
+        json={"plan": parsed["plan"], "preview": parsed["preview"], "adapter_mode": "fake"},
+    ).json()
+    client.post(f"/api/demo/tasks/{task['task_id']}/confirm")
+
+    response = client.get("/mock/merchant")
+
+    assert response.status_code == 200
+    assert '"price":1000.0' in response.text

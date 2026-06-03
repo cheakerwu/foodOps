@@ -154,6 +154,10 @@
         scenario: null,
       };
 
+      if (window.__MOCK_MERCHANT_INITIAL_STATE__) {
+        state = window.__MOCK_MERCHANT_INITIAL_STATE__;
+      }
+
       function showToast(message, isError) {
         var toast = document.getElementById("toast");
         toast.textContent = message;
@@ -173,6 +177,61 @@
 
       function hideBanner() {
         document.getElementById("alertBanner").style.display = "none";
+      }
+
+      function renderSaleStatus(itemId, status) {
+        var label = document.querySelector('[data-testid="status-label-' + itemId + '"]');
+        if (!label) return;
+        if (status === "on_sale") {
+          label.textContent = "在售";
+          label.className = "status-on";
+        } else if (status === "off_sale") {
+          label.textContent = "已下架";
+          label.className = "status-off";
+        } else if (status === "sold_out") {
+          label.textContent = "已售罄";
+          label.className = "status-off";
+        }
+      }
+
+      function renderState() {
+        document.getElementById("storePhone").value = state.phone;
+        document.getElementById("businessHoursStart").value = state.businessHours[0].start;
+        document.getElementById("businessHoursEnd").value = state.businessHours[0].end;
+        Object.keys(state.items).forEach(function (itemId) {
+          var item = state.items[itemId];
+          var input = document.querySelector('[data-testid="price-input-' + itemId + '"]');
+          if (input) {
+            input.value = Number(item.price).toFixed(2);
+          }
+          renderSaleStatus(itemId, item.saleStatus);
+        });
+      }
+
+      function applyServerSnapshot(nextState) {
+        var scenario = state.scenario;
+        state = nextState;
+        state.scenario = scenario;
+        renderState();
+      }
+
+      function shouldRefreshFromServer() {
+        var active = document.activeElement;
+        return !active || !active.matches("input, select, textarea");
+      }
+
+      function loadServerSnapshot() {
+        if (window.location.protocol === "file:" || !window.fetch || !shouldRefreshFromServer()) {
+          return;
+        }
+        fetch("/api/mock/merchant/snapshot")
+          .then(function (response) {
+            return response.ok ? response.json() : null;
+          })
+          .then(function (nextState) {
+            if (nextState) applyServerSnapshot(nextState);
+          })
+          .catch(function () {});
       }
 
       function applyScenario() {
@@ -275,6 +334,12 @@
       window.__mockMerchant.getSnapshot = getSnapshot;
       window.__mockMerchant.setScenario = setScenario;
       window.__mockMerchant.reset = resetScenario;
+
+      renderState();
+      loadServerSnapshot();
+      if (window.location.protocol !== "file:") {
+        setInterval(loadServerSnapshot, 1000);
+      }
 
       // Auto-apply ?scenario= from URL on page load
       (function () {

@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from food_ops_demo.mock_web_adapter import MockWebAdapter
+from food_ops_demo.storage import DemoDatabase
 
 
 @pytest.fixture
@@ -34,6 +35,19 @@ def test_mock_web_adapter_updates_price_through_page(adapter):
 
     assert result.success is True
     assert item.price == "29.90"
+
+
+def test_mock_web_adapter_persists_successful_price_update_to_database(mock_page_url, tmp_path):
+    database = DemoDatabase(tmp_path / "demo.sqlite3")
+    adapter = MockWebAdapter(page_url=mock_page_url, headless=True, database=database)
+    try:
+        result = adapter.update_menu_price("人民广场店", "招牌牛肉饭", "1000.00")
+    finally:
+        adapter.close()
+
+    persisted = database.find_menu_items("人民广场店", "招牌牛肉饭")[0]
+    assert result.success is True
+    assert persisted.price == "1000.00"
 
 
 def test_mock_web_adapter_updates_sale_status_through_page(adapter):

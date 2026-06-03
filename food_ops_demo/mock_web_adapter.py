@@ -6,6 +6,7 @@ from playwright.sync_api import Browser, Page, Playwright, sync_playwright
 
 from food_ops_demo.adapter import BasePlatformAdapter
 from food_ops_demo.models import ErrorDetail, MenuItem, OperationResult, StoreSnapshot
+from food_ops_demo.storage import DemoDatabase
 
 
 class MockWebAdapter(BasePlatformAdapter):
@@ -14,10 +15,12 @@ class MockWebAdapter(BasePlatformAdapter):
         page_url: str,
         screenshot_dir: str | Path | None = None,
         headless: bool = True,
+        database: DemoDatabase | None = None,
     ) -> None:
         self.page_url = page_url
         self.screenshot_dir = Path(screenshot_dir) if screenshot_dir else None
         self.headless = headless
+        self.database = database
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._page: Page | None = None
@@ -53,7 +56,8 @@ class MockWebAdapter(BasePlatformAdapter):
         page = self._ensure_page()
         page.locator(f'[data-testid="price-input-{item.item_id}"]').fill(price)
         page.locator(f'[data-testid="save-price-button-{item.item_id}"]').click()
-        return self._result_from_status()
+        result = self._result_from_status()
+        return self._persist_result(result, lambda: self.database.update_menu_price(store_name, item_name, price))
 
     def update_menu_sale_status(self, store_name: str, item_name: str, sale_status: str) -> OperationResult:
         item = self._find_one(store_name, item_name)
@@ -66,7 +70,11 @@ class MockWebAdapter(BasePlatformAdapter):
             )
         page = self._ensure_page()
         page.locator(f'[data-testid="status-{sale_status}-{item.item_id}"]').click()
-        return self._result_from_status()
+        result = self._result_from_status()
+        return self._persist_result(
+            result,
+            lambda: self.database.update_menu_sale_status(store_name, item_name, sale_status),
+        )
 
     def update_business_hours(self, store_name: str, business_hours: list[dict[str, str]]) -> OperationResult:
         if len(business_hours) != 1:
@@ -79,14 +87,16 @@ class MockWebAdapter(BasePlatformAdapter):
         page.locator('[data-testid="business-hours-start-input"]').fill(business_hours[0]["start"])
         page.locator('[data-testid="business-hours-end-input"]').fill(business_hours[0]["end"])
         page.locator('[data-testid="save-hours-button"]').click()
-        return self._result_from_status()
+        result = self._result_from_status()
+        return self._persist_result(result, lambda: self.database.update_business_hours(store_name, business_hours))
 
     def update_store_phone(self, store_name: str, phone: str) -> OperationResult:
         self.get_snapshot(store_name)
         page = self._ensure_page()
         page.locator('[data-testid="store-phone-input"]').fill(phone)
         page.locator('[data-testid="save-phone-button"]').click()
-        return self._result_from_status()
+        result = self._result_from_status()
+        return self._persist_result(result, lambda: self.database.update_store_phone(store_name, phone))
 
     def _ensure_page(self) -> Page:
         if self._page is not None:
@@ -126,6 +136,16 @@ class MockWebAdapter(BasePlatformAdapter):
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
         self._ensure_page().screenshot(path=str(self.screenshot_dir / f"{name}.png"), full_page=True)
 
+    def _persist_result(self, result: OperationResult, persist) -> OperationResult:
+        if not result.success or self.database is None:
+            return result
+        if persist():
+            return result
+        return OperationResult(
+            success=False,
+            error=ErrorDetail(code="mock_persist_failed", message="Mock 后台操作成功，但同步演示数据失败。"),
+        )
+
 
 def _raw_to_snapshot(raw: dict) -> StoreSnapshot:
     """Transform the page's camelCase snapshot into a StoreSnapshot."""
@@ -155,5 +175,4 @@ def _not_found() -> OperationResult:
         success=False,
         error=ErrorDetail(code="target_not_found", message="找不到目标菜品。"),
     )
-
 
