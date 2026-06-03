@@ -12,7 +12,7 @@
 自然语言指令 -> 标准操作计划 -> 风险校验 -> 人工确认 -> FakeAdapter 执行 -> 回读校验 -> 审计留痕
 ```
 
-当前版本支持 FakeAdapter、MockWebAdapter 和 ShadowMode 三种执行模式。ShadowMode 只读取、定位、预填和截图，不点击保存或提交。不接真实外卖平台、真实 LLM 或多用户权限体系。
+当前版本支持 FakeAdapter、MockWebAdapter、ShadowMode 和 BrowserUseAdapter 四种执行模式。ShadowMode 只读取、定位、预填和截图，不点击保存或提交。BrowserUseAdapter 通过 browser-use AI 代理驱动真实浏览器，为实验性功能。不接真实外卖平台、真实 LLM 或多用户权限体系。
 
 ## 目录结构
 
@@ -29,6 +29,7 @@ D:\code\demov1
 │   ├── models.py           # Pydantic request, plan, task, snapshot models
 │   ├── mock_web_adapter.py # MockWebAdapter with Playwright fault injection
 │   ├── shadow_adapter.py   # ShadowPlatformAdapter: read-only prefill with screenshots
+│   ├── browser_use_adapter.py # BrowserUseAdapter: AI agent-driven via browser-use (experimental)
 │   ├── parser.py           # Rule-based Chinese instruction parser
 │   ├── risk.py             # Risk validation and preview generation
 │   ├── storage.py          # SQLite demo data and task persistence
@@ -66,11 +67,38 @@ D:\code\demov1
 - `food_ops_demo.static.index.html`：本地工作台页面，包含指令输入、人工确认、任务中心、快照和审计结果。
 - `food_ops_demo.mock_web_adapter.MockWebAdapter`：通过 Playwright 驱动本地 mock 商家后台页面，验证未来真实 RPA 适配器的执行边界。
 - `food_ops_demo.shadow_adapter.ShadowPlatformAdapter`：Phase 4 的只读/预填适配器，通过 Playwright 打开配置的后台页面，预填低风险输入并截图，明确返回 `submitted=false`。
+- `food_ops_demo.browser_use_adapter.BrowserUseAdapter`：Phase 5 的实验性适配器，通过 browser-use AI 代理驱动真实浏览器完成操作。默认使用 `ChatBrowserUse` 模型，支持云端浏览器（`Browser(use_cloud=True)`）。当前仅支持菜品改价操作。需要安装 `browser-use` 包和设置 `BROWSER_USE_API_KEY` 环境变量。
 - `food_ops_demo.adapter_registry.AdapterRegistry`：创建共享非浏览器适配器和作用域浏览器适配器，使 Playwright 状态不由 FastAPI 路由全局持有。
 - `food_ops_demo.orchestration`：将多门店改价分解为子操作计划和锁键。
 - `food_ops_demo.runner.LocalRunner`：本地执行面原型，获取排队的任务、拥有适配器生命周期并记录完成状态。
 - `operation_jobs` SQLite 表：本地队列，用于建模未来 runner 调度和按门店加锁。
 - `food_ops_demo.static.mock_merchant.html`：本地仿真商家后台，用于 Playwright 点击、截图和异常注入。
+
+## 适配器模式
+
+| 模式 | 说明 | 默认 |
+|------|------|------|
+| `fake` | 内存模式，无浏览器 | 是 |
+| `mock_web` | Playwright 驱动本地 mock 页面 | 否 |
+| `shadow` | Playwright 只读/预填，不提交 | 否 |
+| `browser_use` | AI 代理驱动真实浏览器（实验性） | 否 |
+
+## 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `FOOD_OPS_DATABASE_PATH` | SQLite 数据库路径 | `data/demo/demo.sqlite3` |
+| `FOOD_OPS_AUDIT_PATH` | 审计日志路径 | `data/demo/audit.jsonl` |
+| `FOOD_OPS_MOCK_WEB_URL` | MockWebAdapter 目标地址 | `http://127.0.0.1:8765/mock/merchant` |
+| `FOOD_OPS_MOCK_WEB_SCREENSHOT_DIR` | MockWeb 截图目录 | `data/demo/mock-web-screenshots` |
+| `FOOD_OPS_MOCK_WEB_HEADLESS` | MockWeb 无头模式 | `1` |
+| `FOOD_OPS_SHADOW_URL` | Shadow 目标地址 | 同 MOCK_WEB_URL |
+| `FOOD_OPS_SHADOW_SCREENSHOT_DIR` | Shadow 截图目录 | `data/demo/shadow-mode-evidence` |
+| `FOOD_OPS_SHADOW_HEADLESS` | Shadow 无头模式 | `1` |
+| `FOOD_OPS_BROWSER_USE_URL` | BrowserUse 目标地址 | `http://127.0.0.1:8765/mock/merchant` |
+| `FOOD_OPS_BROWSER_USE_SCREENSHOT_DIR` | BrowserUse 截图目录 | `data/demo/browser-use-screenshots` |
+| `FOOD_OPS_BROWSER_USE_MAX_STEPS` | BrowserUse 单次最大步数 | `25` |
+| `BROWSER_USE_API_KEY` | browser-use LLM API 密钥 | 必填（使用 browser_use 模式时） |
 
 ## 已支持指令
 

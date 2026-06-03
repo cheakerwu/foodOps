@@ -131,6 +131,59 @@ For multi-store price changes, the system decomposes one batch instruction into 
 把人民广场店营业时间改成 10:00 到 21:00
 ```
 
+## Phase 5 BrowserUseAdapter 演示流程（实验性）
+
+`browser_use` 模式通过 [browser-use](https://github.com/browser-use/browser-use) AI 代理驱动真实浏览器完成操作。该模式为实验性功能，默认不启用。
+
+### 安装
+
+```powershell
+uv sync --extra browser_use
+uvx browser-use install
+```
+
+### 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `BROWSER_USE_API_KEY` | browser-use 所用 LLM 的 API 密钥 | 必填 |
+| `FOOD_OPS_BROWSER_USE_URL` | 目标后台页面地址 | `http://127.0.0.1:8765/mock/merchant` |
+| `FOOD_OPS_BROWSER_USE_SCREENSHOT_DIR` | 截图保存目录 | `data/demo/browser-use-screenshots` |
+| `FOOD_OPS_BROWSER_USE_MAX_STEPS` | 单次操作最大步数 | `25` |
+
+启动示例：
+
+```powershell
+$env:BROWSER_USE_API_KEY='your-api-key-here'
+$env:FOOD_OPS_BROWSER_USE_URL='http://127.0.0.1:8765/mock/merchant'
+& 'E:\anaconda\envs\jobhellper\python.exe' -m uvicorn food_ops_demo.asgi:app --host 127.0.0.1 --port 8765
+```
+
+### 使用
+
+1. 打开 `http://127.0.0.1:8765/`。
+2. 在执行模式中选择 `BrowserUse`。
+3. 输入指令，例如 `把人民广场店的招牌牛肉饭改成 29.9`。
+4. 执行后可在任务中心查看结果和截图证据。
+
+### 模型说明
+
+`BrowserUseAdapter` 默认使用 `ChatBrowserUse` 作为 LLM 模型。如果需要自定义模型，可在创建适配器时传入 `llm` 参数。
+
+### 云端浏览器（可选）
+
+默认使用本地浏览器。如需使用云端浏览器，可在创建 `Browser` 实例时启用：
+
+```python
+from browser_use import Browser
+
+browser = Browser(use_cloud=True)
+```
+
+### 支持的操作
+
+当前 `BrowserUseAdapter` 仅支持菜品改价（`update_menu_price`）。其他操作（上下架、营业时间、联系电话）返回 `browser_use_unsupported_operation` 错误。
+
 ## 主要目录
 
 - `food_ops_demo/`：MVP 应用代码。
