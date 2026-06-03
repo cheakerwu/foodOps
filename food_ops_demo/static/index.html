@@ -333,7 +333,11 @@
             <option value="fake">FakeAdapter</option>
             <option value="mock_web">MockWebAdapter</option>
             <option value="shadow">ShadowMode</option>
+            <option value="browser_use">BrowserUseAdapter 实验模式</option>
           </select>
+          <div id="browserUseWarning" class="status" style="display:none;color:var(--warn);margin-top:4px;margin-bottom:0;">
+            实验模式：由 Browser Use Agent 操作页面，速度和结果可能不如 MockWebAdapter 稳定。
+          </div>
           <a href="/mock/merchant" target="_blank" rel="noreferrer">打开 Mock 后台</a>
           <label for="instructionInput">操作指令</label>
           <textarea id="instructionInput">把人民广场店的招牌牛肉饭改成 29.9</textarea>
@@ -385,6 +389,13 @@
         </div>
       </section>
 
+      <section id="evidenceSection" style="display:none;">
+        <div class="panel">
+          <h2 class="panel-title">Browser Use 执行证据</h2>
+          <div id="evidence" class="stack"></div>
+        </div>
+      </section>
+
       <div class="two-col">
         <section>
           <div class="panel">
@@ -425,6 +436,9 @@
       taskList: document.getElementById('taskList'),
       snapshot: document.getElementById('snapshot'),
       audit: document.getElementById('auditOutput'),
+      browserUseWarning: document.getElementById('browserUseWarning'),
+      evidenceSection: document.getElementById('evidenceSection'),
+      evidence: document.getElementById('evidence'),
     };
 
     async function request(path, options = {}) {
@@ -444,7 +458,9 @@
     }
 
     function updateConfirmButtonLabel() {
-      els.confirm.textContent = els.adapterMode.value === 'shadow' ? '开始预填' : '确认执行';
+      const mode = els.adapterMode.value;
+      els.confirm.textContent = mode === 'shadow' ? '开始预填' : '确认执行';
+      els.browserUseWarning.style.display = mode === 'browser_use' ? '' : 'none';
     }
 
     function updateButtons() {
@@ -530,11 +546,38 @@
       `;
     }
 
+    function renderEvidence(task) {
+      const evidence = task.evidence;
+      if (task.adapter_mode !== 'browser_use' || !evidence || (task.state !== 'succeeded' && task.state !== 'failed')) {
+        els.evidenceSection.style.display = 'none';
+        return;
+      }
+      els.evidenceSection.style.display = '';
+      const fields = [
+        ['最终 URL', evidence.final_url],
+        ['观测值', evidence.observed_value],
+        ['截图路径', evidence.screenshot_paths?.join(', ')],
+        ['证据文本', evidence.evidence_text],
+      ];
+      els.evidence.innerHTML = fields
+        .filter(([, value]) => value != null && value !== '')
+        .map(([label, value]) => `
+          <div class="metric">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(String(value))}</strong>
+          </div>
+        `).join('');
+      if (!els.evidence.innerHTML) {
+        els.evidence.innerHTML = '<div class="task-empty">暂无证据数据</div>';
+      }
+    }
+
     function renderTask(task) {
       state.taskId = task.task_id;
       state.taskState = task.state;
       renderPreview(task.plan, task.preview, task.adapter_mode);
       renderTimeline(task);
+      renderEvidence(task);
       updateButtons();
     }
 
@@ -543,6 +586,8 @@
       state.taskState = null;
       renderPreview(null, {});
       renderTimeline(null);
+      els.evidenceSection.style.display = 'none';
+      els.evidence.innerHTML = '';
       updateButtons();
     }
 
