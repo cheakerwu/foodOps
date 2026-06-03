@@ -54,12 +54,27 @@ class StoreSnapshot(BaseModel):
     items: list[MenuItem]
 
 
+class BrowserUseExecutionEvidence(BaseModel):
+    success: bool
+    operation_type: str
+    store_name: str
+    target_name: str
+    expected_value: str
+    observed_value: str | None = None
+    final_url: str | None = None
+    evidence_text: str = ""
+    screenshot_paths: list[str] = Field(default_factory=list)
+    error_code: str | None = None
+    error_message: str | None = None
+
+
 class OperationResult(BaseModel):
     success: bool
     error: ErrorDetail | None = None
     submitted: bool = True
     shadow_mode: bool = False
     evidence: dict[str, Any] = Field(default_factory=dict)
+    screenshot_paths: list[str] = Field(default_factory=list)
 
 
 class ValidationResult(BaseModel):
